@@ -1,12 +1,12 @@
 """
 parking_ui.py
 
-A very simple NiceGUI frontend that pulls data from mock_parking_api.py
+A very simple NiceGUI frontend that pulls data from parking_api.py
 and renders a campus parking permit portal: browse lots, read
 announcements, and buy/cancel permits.
 
 Run with:
-    pip install nicegui requests
+    python -m pip install -r requirements.txt
     python parking_api.py     # in one terminal
     python parking_ui.py      # in another terminal
 

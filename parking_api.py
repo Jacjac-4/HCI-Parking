@@ -6,7 +6,7 @@ see permit types and availability, purchase/cancel a permit, and read
 parking announcements (closures, construction, etc).
 
 Run with:
-    pip install fastapi uvicorn
+    python -m pip install -r requirements.txt
     python parking_api.py
 
 API is available at http://localhost:8003
