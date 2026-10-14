@@ -1,9 +1,9 @@
 """
 parking_ui.py
 
-A very simple NiceGUI frontend that pulls data from parking_api.py
-and renders a campus parking permit portal: browse lots, read
-announcements, and buy/cancel permits.
+NiceGUI parking portal with shared navigation and a task dashboard.
+The permit pages currently use the starter purchase/cancel API;
+guided applications and ticket processing will be added separately.
 
 Run with:
     python -m pip install -r requirements.txt
@@ -13,8 +13,12 @@ Run with:
 Then http://localhost:8082 will open automatically
 """
 
+from urllib.parse import urlencode
+
 import requests
 from nicegui import ui
+
+from portal_layout import PARKING_MAPS, action_link, heading, page_layout
 
 API_BASE = "http://localhost:8003"
 
@@ -56,20 +60,109 @@ def cancel_permit(permit_id: int):
 
 @ui.page("/")
 def main_page():
-    render_portal()
+    with page_layout("/"):
+        render_dashboard()
+
+
+@ui.page("/permits")
+def permits_page():
+    with page_layout("/permits"):
+        render_portal("permits")
+
+
+@ui.page("/my-parking")
+def my_parking_page():
+    with page_layout("/my-parking"):
+        render_portal("my-parking")
+
+
+@ui.page("/lots")
+def lots_page():
+    with page_layout("/"):
+        heading("Where can I park?")
+        ui.label("These are sample lots. Capacity is not the number of empty spaces.")
+        render_lots()
+        render_announcements()
+        ui.link("Official UNH campus parking maps", PARKING_MAPS, new_tab=True)
+
+
+@ui.page("/tickets")
+def tickets_page(ticket_number: str = ""):
+    with page_layout("/tickets"):
+        heading("Pay or appeal a ticket")
+        if ticket_number:
+            ui.label(f"Ticket number: {ticket_number}")
+        ui.label("Ticket lookup, payment, and appeals are not available in this version yet.")
+        action_link("Back to home", "/")
+
+
+@ui.page("/help")
+def help_page():
+    with page_layout("/help"):
+        heading("Parking help")
+        ui.label("Browse sample permit options under Permits and purchased permits under My Parking.")
+        ui.label("Guided parking help is not available in this version yet.")
+
+
+def render_dashboard():
+    with ui.column().classes("page-intro"):
+        heading("My Parking")
+        ui.label("Find a permit, check your status, or manage a ticket.").classes("page-description")
+    with ui.element("div").classes("dashboard-grid"):
+        with ui.card().classes("task-card"):
+            heading("Get a parking permit", 2)
+            with ui.element("ol").classes("permit-steps").props('aria-label="Permit application steps"'):
+                for number, title in enumerate(("About you", "Permit", "Vehicle", "Review", "Confirmation"), 1):
+                    with ui.element("li"):
+                        ui.label(str(number)).classes("step-number")
+                        ui.label(title)
+            ui.label("See permit options, costs, and rules. Check your details before submitting.")
+            ui.label("The guided application is not available yet; you can browse sample permits.").classes("support-copy")
+            action_link("Find my permit", "/permits", primary=True)
+        with ui.card().classes("task-card"):
+            heading("My permit status", 2)
+            ui.label("Application status unavailable").classes("status-note")
+            ui.label("Application tracking is not connected yet. You can view purchased sample permits in My Parking.")
+            ui.label("An application alone does not authorize parking.").classes("support-copy")
+            action_link("View status and next steps", "/my-parking")
+        with ui.card().classes("task-card"):
+            heading("Where can I park?", 2)
+            ui.label("Explore lot information and campus maps before choosing a permit.")
+            with ui.element("div").classes("map-access"):
+                ui.icon("map").props('aria-hidden="true"')
+                ui.label("Campus parking maps and lot information")
+            ui.label("Permit-specific coverage is not connected yet. A permit does not guarantee an open space.").classes("support-copy")
+            action_link("View lots and map", "/lots")
+        with ui.card().classes("task-card"):
+            heading("Pay or appeal a ticket", 2)
+            with ui.element("div").classes("ticket-search"):
+                ticket = ui.input("Ticket number").props("outlined maxlength=40")
+
+                def open_ticket():
+                    number = (ticket.value or "").strip()
+                    if not number:
+                        ticket.error = "Enter a ticket number."
+                        return
+                    ui.navigate.to("/tickets?" + urlencode({"ticket_number": number}))
+
+                ticket.on("keydown.enter", open_ticket)
+                ui.button("Search", on_click=open_ticket).props("no-caps unelevated")
+            ui.label("Ticket lookup is not connected yet. Your number will carry over to the ticket page.").classes("support-copy")
+            ui.label("Review selected tickets and the total before paying. Keep your receipt.")
 
 
 @ui.refreshable
-def render_portal():
-    ui.label("Campus Parking Portal").classes("text-2xl")
+def render_portal(page: str = "home"):
+    if page == "permits":
+        heading("Permits")
+        render_permit_types()
+        return
+    if page == "my-parking":
+        heading("My Parking")
+        render_my_permits()
+        return
 
-    with ui.row().classes("w-full no-wrap"):
-        with ui.column().classes("w-1/2 p-2"):
-            render_lots()
-            render_announcements()
-        with ui.column().classes("w-1/2 p-2"):
-            render_permit_types()
-            render_my_permits()
+    render_dashboard()
 
 
 def render_lots():
@@ -118,4 +211,4 @@ def render_my_permits():
             )
 
 
-ui.run(port=8082, title="Mock Parking Portal")
+ui.run(port=8082, title="UNH Parking — Demo")
