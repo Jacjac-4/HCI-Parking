@@ -36,48 +36,55 @@ already has a different interpreter selected, use **Python: Select Interpreter**
 and select this repository's `.venv/bin/python`. When opening the parent CS 760
 folder, select `Design Sprint 2/HCI-Parking/.venv/bin/python`.
 
-## Permit planner and official data
+## Independent prototype
 
-The application starts empty. Users enter their name, student year, residence,
-and vehicle; no runtime sample accounts, permits, announcements, or tickets are seeded.
-The five-step form retains entries when using Back/Edit, validates them, and saves
-local confirmations under My Parking. Reloading the form starts a new application.
+The five-step permit journey runs entirely inside this application: About you,
+Permit, Vehicle, Review, and Confirmation. Users enter their own information;
+there are no seeded people, vehicles, applications, or tickets. Submissions appear
+as **Under review** in My Parking, with an explicit explanation that an application
+does not authorize parking. This course prototype does not issue real permits.
 
-`unh_catalog.py` contains published Durham academic-year student permit categories,
-prices, eligibility guidance, and lot coverage checked October 14, 2026:
+Users can inspect their submitted details, open the lots covered by their selected
+permit, or confirm withdrawal and submit a corrected application. Withdrawal is
+safe to retry. Parking help provides in-app guidance for these tasks. No user
+workflow redirects to the existing UNH portal or permit store.
+
+`unh_catalog.py` contains published Durham academic-year student categories,
+prices, eligibility guidance, and lot coverage checked October 14, 2026. Reference
+sources (documentation only, not application destinations):
 
 - https://www.unh.edu/transportation/parking/permits/student
 - https://www.unh.edu/transportation/parking/parking-permits/permit-prices
 - https://www.unh.edu/transportation/parking/campus-parking-maps
 
-Suggestions use self-reported answers, not verified UNH eligibility. Published
-prices exclude the $3.95 student online processing fee displayed during review.
-The official store requires sign-in for account-specific availability, lotteries,
-and waitlists: https://unh.thepermitstore.com/purchase.php. No live capacity,
-inventory, or approval information is fabricated. Summer, employee, and visitor
-permits remain on the official UNH site.
+Suggestions use self-reported answers. There is no invented inventory or automated
+approval. Listed permit prices are reference prices; this prototype collects no
+payment or processing fee. Summer, employee, and visitor flows are out of scope.
 
-## Local application API
+## API and prototype limits
 
-`GET /permit-types` and `GET /lots` return published reference information.
+`GET /permit-types` and `GET /lots` return reference information.
 `POST /applications` accepts `permit_type_id`, `applicant` (name, residence,
 year, commuter_eligible), `vehicle` (plate, two-letter state, car/motorcycle/moped),
-and a UUID `request_id`. Same-ID retries return the same confirmation; changed
+and a UUID `request_id`. Same-ID retries return the same application; changed
 payloads with that ID return 409. The UI preserves the payload after an uncertain
-response, and pauses editing until Retry resolves the outcome.
+response and pauses editing until Retry resolves the outcome.
 
-Saved records have `status: saved_locally` and `authorization: not_valid`.
-They are NOT submitted to UNH, purchased permits, or parking authorization.
-The confirmation links to the official store to complete a real order.
-`GET /applications` and `GET /applications/{id}` return only user-entered records.
+`GET /applications` and `GET /applications/{id}` retrieve user-entered records.
+`POST /applications/{id}/withdraw` changes a pending application to withdrawn.
+Both states retain `authorization: not_valid`; refresh never approves a permit.
 
-This is a single-user, local course application. Both servers bind to loopback.
-Records are held in memory and reset on API restart; no login or multi-user
-storage is implemented. Do not expose it as a shared service. Ticket payment,
-appeals, and guided help remain future implementation chunks.
+This is a single-user local prototype. Servers bind to loopback. Records are
+in memory and reset on API restart; no authentication or durable storage is
+implemented. Run one API process. Ticket interactions and a geographic map are
+not implemented in this chunk. Parking help is a guided FAQ, not an AI chatbot.
 
-Run checks:
+## Checks
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v
 ```
+
+Browser checks should cover entering details, reviewing and submitting, visiting
+My Parking, opening covered lots, cancelling a withdrawal, confirming withdrawal,
+and navigating help. Clear any temporary test records by restarting the API.

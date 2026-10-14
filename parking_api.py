@@ -1,4 +1,4 @@
-"""Local single-user application planner. Starts empty; no real permit transactions."""
+"""Local single-user prototype. Starts empty; no real permit transactions."""
 from datetime import datetime, timezone
 from threading import RLock
 from typing import Literal
@@ -9,7 +9,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from unh_catalog import LOTS, PERMIT_TYPES, eligible
 
-app = FastAPI(title="Parking application planner")
+app = FastAPI(title="Parking prototype")
 APPLICATIONS = []
 APPLICATION_REQUESTS = {}
 application_lock = RLock()
@@ -89,8 +89,8 @@ def submit_application(req: ApplicationRequest):
             if (existing["permit_type_id"] == req.permit_type_id
                     and existing["vehicle"]["plate"] == req.vehicle.plate
                     and existing["vehicle"]["state"] == req.vehicle.state
-                    and existing["status"] == "saved_locally"):
-                raise HTTPException(status_code=409, detail="An application for this permit and vehicle is already saved")
+                    and existing["status"] == "under_review"):
+                raise HTTPException(status_code=409, detail="An application for this permit and vehicle is already under review")
 
         application = {
             "id": f"APP-{len(APPLICATIONS) + 1:04d}",
@@ -101,14 +101,30 @@ def submit_application(req: ApplicationRequest):
             "price": permit["price"],
             "vehicle": req.vehicle.model_dump(),
             "submitted_at": datetime.now(timezone.utc).isoformat(),
-            "status": "saved_locally",
+            "status": "under_review",
             "authorization": "not_valid",
-            "status_explanation": "Saved on this computer; not sent to UNH. This record does not authorize parking.",
-            "next_action": "Sign in to the official UNH permit store to check availability and place your order.",
+            "status_explanation": "Application received; not yet approved. This application does not authorize parking.",
+            "next_action": "Review your application details in My Parking. You can withdraw an incorrect application and submit a corrected one.",
             "permit_id": None,
         }
         APPLICATIONS.append(application)
         APPLICATION_REQUESTS[request_id] = {"payload": payload, "application": application}
+        return application
+
+
+@app.post("/applications/{application_id}/withdraw")
+def withdraw_application(application_id: str):
+    with application_lock:
+        application = get_application(application_id)
+        if application["status"] == "withdrawn":
+            return application
+        if application["status"] != "under_review":
+            raise HTTPException(status_code=409, detail="Only pending applications can be withdrawn")
+        application.update(
+            status="withdrawn",
+            status_explanation="Application withdrawn. This application does not authorize parking.",
+            next_action="Start a new application if you still need a permit.",
+        )
         return application
 
 

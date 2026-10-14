@@ -5,7 +5,6 @@ Prices: https://www.unh.edu/transportation/parking/parking-permits/permit-prices
 This catalog does not represent live inventory or an eligibility decision.
 """
 SOURCE = 'https://www.unh.edu/transportation/parking/permits/student'
-STORE = 'https://unh.thepermitstore.com/purchase.php'
 RESIDENCES = {
     'off_campus': 'Off campus',
     'gables': 'Gables',

@@ -13,9 +13,6 @@ NAVIGATION = (
     ("Tickets", "/tickets"),
     ("Parking Help", "/help"),
 )
-PARKING_SERVICES = "https://www.unh.edu/transportation/virtual-counter"
-PARKING_CONTACT = "https://www.unh.edu/transportation/about/contact-us"
-PARKING_MAPS = "https://www.unh.edu/transportation/parking/campus-parking-maps"
 
 
 def heading(text: str, level: int = 1):
@@ -38,8 +35,9 @@ def page_layout(current_path: str):
                 ui.link("UNH Parking", "/").classes("site-title")
             with ui.dialog() as account_dialog, ui.card().classes("account-dialog"):
                 heading("My account", 2)
-                ui.label("Local application planner")
-                ui.label("Enter your details in Find my permit. This local planner does not sign you into UNH; use the official permit store for your UNH account.")
+                ui.label("Your parking applications")
+                ui.label("Enter your details when applying. View your submitted information and manage applications in My Parking.")
+                action_link("Open My Parking", "/my-parking")
                 ui.button("Close", on_click=account_dialog.close).props("no-caps unelevated")
             ui.button("My account", icon="person_outline", on_click=account_dialog.open).props(
                 "outline color=white no-caps"
@@ -51,12 +49,12 @@ def page_layout(current_path: str):
                     if path == current_path:
                         link.props('aria-current="page"')
     with ui.column().classes("site-width portal-content").props('id="main-content" tabindex="-1"'):
-        ui.label("COURSE PROJECT · LOCAL PLANNER · NOT CONNECTED TO UNH ACCOUNTS").classes("demo-notice")
+        ui.label("COURSE PROTOTYPE · NO REAL PERMITS OR PAYMENTS").classes("demo-notice")
         yield
     with ui.element("footer").classes("site-width portal-footer"):
         with ui.column().classes("footer-links"):
-            ui.link("Parking services and forms", PARKING_SERVICES, new_tab=True)
-            ui.link("Contact parking staff", PARKING_CONTACT, new_tab=True)
+            ui.link("Parking services and help", "/help")
+            ui.link("Permit rules and lot information", "/lots")
         with ui.link(target="/help").classes("help-launcher"):
             ui.icon("chat_bubble_outline").props('aria-hidden="true"')
             ui.label("Parking help")

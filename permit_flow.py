@@ -6,7 +6,7 @@ from nicegui import ui
 
 from parking_client import ApiError, request
 from portal_layout import action_link, heading
-from unh_catalog import COMMUTER_RULE, RESIDENCES, SOURCE, STORE, eligible
+from unh_catalog import COMMUTER_RULE, RESIDENCES, eligible
 
 STEPS = ("About you", "Permit", "Vehicle", "Review", "Confirmation")
 
@@ -88,7 +88,7 @@ async def render_permit_flow():
             if state["error"]:
                 ui.label(state["error"]).props('role="alert"').classes("text-red-800")
             if step == 0:
-                ui.label("Enter your information to find student permit options. Saved records stay in this local session until the server restarts.")
+                ui.label("Enter your information to find student permit options. You can review everything before submitting.")
                 fields.append(ui.input("Your name", validation={"Enter your name.": lambda v: bool((v or "").strip())})
                               .bind_value(applicant, "name").props("outlined maxlength=100").classes("w-full"))
                 fields.append(ui.select(RESIDENCES, label="Where do you live?", validation={"Choose your residence.": lambda v: v in RESIDENCES})
@@ -98,18 +98,20 @@ async def render_permit_flow():
                               .bind_value(applicant, "year").props("outlined").classes("w-full"))
                 ui.label(COMMUTER_RULE)
                 ui.checkbox("I live off campus and meet all the commuter distance and residence requirements above.").bind_value(applicant, "commuter_eligible")
-                ui.link("Check UNH eligibility rules", SOURCE, new_tab=True)
+                action_link("Eligibility help", "/help")
             elif step == 1:
                 choices = {p["id"]: f'{p["name"]} · ${p["price"]:.2f} · {p["term"]}'
                            for p in permits if eligible(p["id"], applicant)}
                 fields.append(ui.select(choices, label="Permit", validation={"Choose a permit.": lambda v: v in choices})
                               .bind_value(state, "permit_id").props("outlined").classes("w-full"))
                 if not choices:
-                    ui.label("No academic-year student options match these answers. Contact Parking Services to discuss your circumstances.").props('role="status"')
+                    ui.label("No academic-year student options match these answers. Review your answers or open Parking help for eligibility guidance.").props('role="status"')
                 for permit in permits:
+                    if permit["id"] not in choices:
+                        continue
                     ui.label(f'{permit["name"]}: {permit["eligibility_reason"]} Requires a {permit["vehicle_requirement"]}.')
 
-                ui.label("Published academic-year student options, checked October 14, 2026. UNH verifies eligibility; sign in to its store for availability, lotteries, and waitlists. Student online orders add a $3.95 processing fee. Summer and employee options are available through UNH.").classes("support-copy")
+                ui.label("Options match your answers. Eligibility still needs review; submitting does not reserve a space. Resident and storage permits are limited and may require a lottery or waitlist. This prototype covers academic-year student permits.").classes("support-copy")
             elif step == 2:
                 permit = selected_permit()
                 ui.label(f'Selected: {permit["name"]} · Requires a {permit["vehicle_requirement"]}.')
@@ -129,23 +131,22 @@ async def render_permit_flow():
                 ui.label(f'Vehicle: {vehicle["plate"].strip().upper()} · {vehicle["state"].strip().upper()} · {vehicle["vehicle_type"]}')
                 ui.label(f'Applicant: {applicant["name"]} · {RESIDENCES[applicant["residence"]]}')
                 ui.label("Covered parking: " + ", ".join(permit["lots"]))
-                ui.label("Published price plus $3.95 online processing fee. No payment is collected here.")
-                ui.label("Save your details locally, then order through the official UNH store. Saving here does not submit an order to UNH.").classes("status-note")
+                ui.label("No payment is due when you submit this prototype application.")
+                ui.label("Submit your application for review. You will receive a confirmation and can track it in My Parking. An application does not authorize parking.").classes("status-note")
                 ui.checkbox("I reviewed the permit and vehicle details.").bind_value(state, "reviewed").set_enabled(not state["busy"] and not uncertain)
                 with ui.row():
                     ui.button("Edit about you", on_click=lambda: go(0)).props("flat no-caps").set_enabled(not state["busy"] and not uncertain)
                     ui.button("Edit permit", on_click=lambda: go(1)).props("flat no-caps").set_enabled(not state["busy"] and not uncertain)
                     ui.button("Edit vehicle", on_click=lambda: go(2)).props("flat no-caps").set_enabled(not state["busy"] and not uncertain)
-                    ui.button("Retry submission" if uncertain else "Save application", on_click=submit).props("no-caps unelevated").set_enabled(not state["busy"])
+                    ui.button("Retry submission" if uncertain else "Submit application", on_click=submit).props("no-caps unelevated").set_enabled(not state["busy"])
                 if state["busy"]:
                     ui.label("Submitting your application…").props('role="status"')
             else:
-                ui.label("Application saved locally").classes("font-semibold").props('role="status"')
+                ui.label("Application received").classes("font-semibold").props('role="status"')
                 ui.label(f'Confirmation: {confirmation["id"]}')
                 ui.label(f'{confirmation["permit_type_name"]} · {confirmation["term"]}')
                 ui.label(confirmation["status_explanation"]).classes("status-note")
                 ui.label(confirmation["next_action"])
-                ui.link("Continue to UNH permit store", STORE, new_tab=True)
                 action_link("View my application", "/my-parking", primary=True)
             if step < 3:
                 with ui.row():
@@ -156,23 +157,58 @@ async def render_permit_flow():
 
 
 async def render_applications():
-    """Show only user-entered local records."""
-    heading("Saved applications", 2)
-    ui.label("Records on this computer only; they reset when the server restarts. Check the UNH store for actual order status.")
-    ui.link("Open UNH permit store", STORE, new_tab=True)
-    try:
-        applications = await request("GET", "/applications")
-    except ApiError as error:
-        ui.label(str(error)).props('role="alert"')
-        action_link("Try again", "/my-parking")
-        return
-    if not applications:
-        ui.label("You have no applications yet.")
-        action_link("Find my permit", "/permits")
-    for application in reversed(applications):
-        with ui.card().classes("task-card w-full"):
-            heading(application["permit_type_name"], 2)
-            ui.label(f'Confirmation: {application["id"]} · {application["status"].replace("_", " ").title()}')
-            ui.label(f'Vehicle: {application["vehicle"]["plate"]} · {application["vehicle"]["state"]}')
-            ui.label(application["status_explanation"]).classes("status-note")
-            ui.label(application["next_action"])
+    """Show user-entered application status and available next actions."""
+    heading("My applications", 2)
+    ui.label("Applications remain under review in this prototype until you withdraw them. No real permits or approvals are issued.").classes("support-copy")
+    content = ui.column().classes("w-full")
+
+    async def refresh():
+        content.clear()
+        with content:
+            try:
+                applications = await request("GET", "/applications")
+            except ApiError as error:
+                ui.label(str(error)).props('role="alert"')
+                ui.button("Try again", on_click=refresh).props("no-caps")
+                return
+            if not applications:
+                ui.label("You have no applications yet.")
+                action_link("Find my permit", "/permits")
+            for application in reversed(applications):
+                with ui.card().classes("task-card w-full"):
+                    heading(application["permit_type_name"], 2)
+                    ui.label(application["status"].replace("_", " ").upper()).classes("status-note")
+                    ui.label(f'Confirmation: {application["id"]}')
+                    ui.label(f'Applicant: {application["applicant"]["name"]}')
+                    ui.label(f'Vehicle: {application["vehicle"]["plate"]} · {application["vehicle"]["state"]}')
+                    ui.label(application["status_explanation"])
+                    ui.label(application["next_action"])
+                    action_link("View covered lots", f'/lots?permit_id={application["permit_type_id"]}')
+                    if application["status"] == "under_review":
+                        withdrawal_dialog(application, refresh)
+                    else:
+                        action_link("Start a new application", "/permits")
+    await refresh()
+
+
+def withdrawal_dialog(application, refresh):
+    with ui.dialog() as dialog, ui.card():
+        heading("Withdraw application?", 2)
+        ui.label(f'Withdraw {application["id"]} for {application["permit_type_name"]}? You can submit a new application afterward.')
+        error_label = ui.label("").props('role="alert"')
+
+        async def withdraw():
+            confirm.disable()
+            try:
+                await request("POST", f'/applications/{application["id"]}/withdraw')
+            except ApiError as error:
+                error_label.set_text(str(error) + " You can safely retry withdrawing this application.")
+                confirm.enable()
+                return
+            dialog.close()
+            await refresh()
+
+        with ui.row():
+            ui.button("Keep application", on_click=dialog.close).props("flat no-caps")
+            confirm = ui.button("Confirm withdrawal", on_click=withdraw).props("no-caps")
+    ui.button("Withdraw application", on_click=dialog.open).props("outline no-caps")

@@ -33,14 +33,14 @@ class ApplicationTests(unittest.TestCase):
         response = self.submit()
         self.assertEqual(response.status_code, 200)
         record = response.json()
-        self.assertEqual(record["status"], "saved_locally")
+        self.assertEqual(record["status"], "under_review")
         self.assertEqual(record["authorization"], "not_valid")
         self.assertIsNone(record["permit_id"])
         self.assertEqual(record["vehicle"]["plate"], "DEMO123")
         self.assertEqual(record["vehicle"]["state"], "NH")
         self.assertEqual(self.client.get('/applications/' + record["id"]).json(), record)
         self.assertEqual(self.client.get('/applications').json(), [record])
-        self.assertEqual(self.client.get('/applications/' + record["id"]).json()["status"], "saved_locally")
+        self.assertEqual(self.client.get('/applications/' + record["id"]).json()["status"], "under_review")
 
     def test_retry_returns_same_confirmation_and_changed_retry_is_rejected(self):
         first = self.submit().json()
@@ -110,6 +110,18 @@ class ApplicationTests(unittest.TestCase):
         body["applicant"] = {**self.body["applicant"], "name": " "}
         self.assertEqual(self.submit(body).status_code, 422)
         self.assertEqual(self.submit().json()["applicant"], self.body["applicant"])
+
+    def test_withdrawal_is_retry_safe_and_allows_corrected_application(self):
+        record = self.submit().json()
+        path = '/applications/' + record['id'] + '/withdraw'
+        withdrawn = self.client.post(path).json()
+        self.assertEqual(withdrawn['status'], 'withdrawn')
+        self.assertEqual(withdrawn['authorization'], 'not_valid')
+        self.assertEqual(self.client.post(path).json(), withdrawn)
+        self.assertEqual(self.client.get('/applications/' + record['id']).json(), withdrawn)
+        self.body['request_id'] = str(uuid4())
+        self.assertEqual(self.submit().status_code, 200)
+        self.assertEqual(self.client.post('/applications/missing/withdraw').status_code, 404)
 
 
 if __name__ == '__main__':
