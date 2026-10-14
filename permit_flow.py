@@ -98,7 +98,8 @@ async def render_permit_flow():
                               .bind_value(applicant, "year").props("outlined").classes("w-full"))
                 ui.label(COMMUTER_RULE)
                 ui.checkbox("I live off campus and meet all the commuter distance and residence requirements above.").bind_value(applicant, "commuter_eligible")
-                action_link("Eligibility help", "/help")
+                with ui.expansion("Help with eligibility").classes("w-full"):
+                    ui.label("Your residence and year determine the suggested categories. A match is not an approval. Off-campus students who do not meet commuter requirements can consider Non-Resident storage. Freshmen living on campus do not match these student permit categories.")
             elif step == 1:
                 choices = {p["id"]: f'{p["name"]} · ${p["price"]:.2f} · {p["term"]}'
                            for p in permits if eligible(p["id"], applicant)}

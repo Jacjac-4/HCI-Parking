@@ -13,14 +13,18 @@ Then open http://localhost:8082
 """
 
 from urllib.parse import urlencode
+from pathlib import Path
 
-from nicegui import ui
+from nicegui import app, ui
 from parking_client import ApiError, request
 
 from portal_layout import action_link, heading, page_layout
 from permit_flow import render_applications, render_permit_flow
 from ticket_flow import render_tickets
+from parking_maps import render_map
 from unh_catalog import PERMIT_TYPES, COMMUTER_RULE
+
+app.add_static_files("/assets", Path(__file__).parent / "assets")
 
 @ui.page("/")
 async def main_page():
@@ -69,6 +73,12 @@ def help_page():
         with ui.expansion("Does under review mean I can park?").classes("w-full"):
             ui.label("No. Under review means your application was received, not approved. It does not authorize parking. This course prototype does not issue real permits.")
             action_link("Check my applications", "/my-parking")
+        with ui.expansion("How do I pay or appeal a ticket?").classes("w-full"):
+            ui.label("Add your ticket number, amount, and reason. Select one or more unpaid tickets, choose Pay selected or Appeal selected, then review the tickets and total. Appeals require an explanation. Confirmations can be viewed and downloaded from the ticket record.")
+            ui.label("These actions change prototype records only; no real money or citation is involved.")
+            action_link("Manage tickets", "/tickets")
+        with ui.expansion("Will my information still be here later?").classes("w-full"):
+            ui.label("Submitted applications and tickets stay available while the server runs. Restarting the server clears them. Unsubmitted form details and ticket selections reset when you leave or reload the page.")
         with ui.expansion("Am I eligible for a commuter permit?").classes("w-full"):
             ui.label(COMMUTER_RULE)
         with ui.expansion("Where can I park with my permit?").classes("w-full"):
@@ -111,12 +121,22 @@ def render_dashboard(applications, status_unavailable=False):
             action_link("View status and next steps", "/my-parking")
         with ui.card().classes("task-card"):
             heading("Where can I park?", 2)
-            ui.label("Explore covered lots before choosing a permit.")
-            with ui.element("div").classes("map-access"):
-                ui.icon("map").props('aria-hidden="true"')
-                ui.label("Campus lot information")
-            ui.label("See the actual lots covered by each student permit. A permit does not guarantee an open space.").classes("support-copy")
-            action_link("View covered lots", "/lots")
+            ui.label("Choose a permit to see covered lots and a campus map.")
+            lot_choice = ui.select({p["id"]: p["name"] for p in PERMIT_TYPES}, label="Permit type",
+                                   on_change=lambda: map_preview.refresh()).props("outlined").classes("w-full")
+
+            @ui.refreshable
+            def map_preview():
+                permit = next((p for p in PERMIT_TYPES if p["id"] == lot_choice.value), None)
+                if permit:
+                    render_map(permit, preview=True)
+                    action_link("View lots and map", f'/lots?permit_id={permit["id"]}')
+                else:
+                    with ui.element("div").classes("map-access"):
+                        ui.icon("map").props('aria-hidden="true"')
+                        ui.label("Select a permit to preview its map")
+                    action_link("View lots and map", "/lots")
+            map_preview()
         with ui.card().classes("task-card"):
             heading("Pay or appeal a ticket", 2)
             with ui.element("div").classes("ticket-search"):
@@ -151,6 +171,7 @@ def render_lots(permit_id=0):
             for lot in permit["lots"]:
                 ui.label(lot)
             ui.label(permit["eligibility_reason"])
+            render_map(permit)
     coverage()
     ui.label("Source checked October 14, 2026. Summer, visitor, and employee parking have different rules.").classes("support-copy")
 

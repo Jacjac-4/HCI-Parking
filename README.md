@@ -76,7 +76,7 @@ Both states retain `authorization: not_valid`; refresh never approves a permit.
 
 This is a single-user local prototype. Servers bind to loopback. Records are
 in memory and reset on API restart; no authentication or durable storage is
-implemented. Run one API process. A geographic map is not yet implemented. Parking help is a guided FAQ, not an AI chatbot.
+implemented. Run one API process. Published permit-specific UNH map images are bundled locally. Parking help is a guided FAQ, not an AI chatbot.
 
 ## Checks
 
@@ -114,3 +114,11 @@ information is requested and no external payment or appeal service is contacted.
 in cents, explanation, and a UUID request ID. The API validates all selected tickets
 before changing any status. Already-resolved tickets and stale totals are rejected.
 Same-request retries recover the original confirmation without a second action.
+
+## In-app maps
+
+Choose a permit on Home or Where can I park? to see actual covered lots and the
+corresponding published UNH map. Full-size images also open locally. Attribution
+and original source URLs are in `assets/maps/README.md`. Maps are reference images,
+not real-time availability or navigation. Resident Core maps show multiple
+categories; the adjacent text identifies the selected permit's covered lots.

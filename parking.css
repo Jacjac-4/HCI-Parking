@@ -64,3 +64,5 @@ a:focus-visible, button:focus-visible { outline: 3px solid #2775c6; outline-offs
     .portal-footer { align-items: stretch; flex-direction: column; }
     .ticket-search { flex-wrap: wrap; }
 }
+/* User-entered ticket reasons and names must not widen cards on small screens. */
+.task-card, .q-dialog .q-card { overflow-wrap: anywhere; }
