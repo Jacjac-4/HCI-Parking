@@ -6,10 +6,7 @@ from nicegui import ui
 
 from parking_client import ApiError, request
 from portal_layout import heading
-
-
-def money(cents):
-    return f'${cents // 100:,}.{cents % 100:02d}'
+from ticket_actions import money, review_action, show_confirmation
 
 
 def valid_amount(value):
@@ -19,7 +16,7 @@ def valid_amount(value):
 async def render_tickets(ticket_number=""):
     heading("Pay or appeal a ticket")
     ui.label("Enter your ticket details, then search and select tickets to review their total.")
-    ui.label("Only tickets you enter appear here. Records reset when the server restarts. Payment and appeal actions are coming in the next prototype step.").classes("support-copy")
+    ui.label("Only tickets you enter appear here. Records reset when the server restarts. Payments and appeals affect this prototype only.").classes("support-copy")
     tickets = []
     selected = {}
     load_error = ""
@@ -48,9 +45,20 @@ async def render_tickets(ticket_number=""):
             tickets = await request("GET", "/tickets")
             loaded = True
             load_error = ""
+            current = {t["id"]: t for t in tickets if t["status"] == "unpaid"}
+            for key in list(selected):
+                if key not in current:
+                    selected.pop(key)
+                else:
+                    selected[key] = current[key]
         except ApiError as error:
             load_error = str(error)
         results.refresh()
+        summary.refresh()
+
+    async def action_complete():
+        selected.clear()
+        await reload_tickets()
 
     def toggle(ticket, checked):
         if checked:
@@ -73,7 +81,10 @@ async def render_tickets(ticket_number=""):
                 ui.label(f'{ticket["number"]} · {money(ticket["amount_cents"])}')
             if selected:
                 ui.label("Your selection includes the tickets listed here, even when search hides them.").classes("support-copy")
-                ui.button("Clear selection", on_click=clear_selection).props("flat no-caps")
+                with ui.row():
+                    ui.button("Pay selected", on_click=lambda: review_action("pay", list(selected.values()), action_complete)).props("no-caps unelevated").set_enabled(not load_error)
+                    ui.button("Appeal selected", on_click=lambda: review_action("appeal", list(selected.values()), action_complete)).props("outline no-caps").set_enabled(not load_error)
+                    ui.button("Clear selection", on_click=clear_selection).props("flat no-caps")
 
     @ui.refreshable
     def results():
@@ -89,12 +100,15 @@ async def render_tickets(ticket_number=""):
             ui.label(f'No saved ticket matches “{query}”. Check the number or add its details below.' if query else "No tickets yet. Add your first ticket below.").props('role="status"')
         for ticket in matches:
             with ui.card().classes("task-card w-full"):
-                ui.checkbox(f'Select ticket {ticket["number"]}', value=ticket["id"] in selected,
-                            on_change=lambda e, t=ticket: toggle(t, e.value))
+                if ticket["status"] == "unpaid":
+                    ui.checkbox(f'Select ticket {ticket["number"]}', value=ticket["id"] in selected,
+                                on_change=lambda e, t=ticket: toggle(t, e.value))
                 heading(f'Ticket {ticket["number"]}', 2)
-                ui.label(f'{money(ticket["amount_cents"])} · Unpaid')
+                ui.label(f'{money(ticket["amount_cents"])} · {ticket["status"].replace("_", " ").title()}')
                 ui.label(ticket["reason"])
                 ui.label("Entered by you").classes("support-copy")
+                if ticket.get("confirmation"):
+                    ui.button("View confirmation", on_click=lambda t=ticket: show_confirmation(t["confirmation"])).props("outline no-caps")
 
     results()
     summary()

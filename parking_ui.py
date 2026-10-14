@@ -2,7 +2,7 @@
 parking_ui.py
 
 NiceGUI parking portal with shared navigation and a task dashboard.
-Guided permit applications use the prototype API; ticket processing is still pending.
+Guided permit applications use the prototype API; ticket payments and appeals run inside the prototype.
 
 Run with:
     python -m pip install -r requirements.txt
@@ -132,7 +132,7 @@ def render_dashboard(applications, status_unavailable=False):
                 ticket.on("keydown.enter", open_ticket)
                 ui.button("Search", on_click=open_ticket).props("no-caps unelevated")
             ui.label("Search tickets you have entered, or open Tickets to add one.").classes("support-copy")
-            ui.label("Select saved tickets and review their total. Payment and appeal actions are coming next.")
+            ui.label("Select tickets, review their total, then pay or appeal. Keep your confirmation.")
 
 
 def render_lots(permit_id=0):

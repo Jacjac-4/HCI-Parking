@@ -76,8 +76,7 @@ Both states retain `authorization: not_valid`; refresh never approves a permit.
 
 This is a single-user local prototype. Servers bind to loopback. Records are
 in memory and reset on API restart; no authentication or durable storage is
-implemented. Run one API process. Prototype payments, appeals, and a geographic map are
-not implemented in this chunk. Parking help is a guided FAQ, not an AI chatbot.
+implemented. Run one API process. A geographic map is not yet implemented. Parking help is a guided FAQ, not an AI chatbot.
 
 ## Checks
 
@@ -101,5 +100,17 @@ Selections belong to the current page and reset on navigation or reload.
 It normalizes ticket numbers, rejects duplicates and invalid amounts, and returns
 the same record for same-request retries. `GET /tickets` lists entered records;
 optional `number` filters by exact normalized number. Tickets have `source:
-user_entered` and `status: unpaid`; they are not verified UNH citations. Nothing is
-charged or appealed in this chunk. Like applications, tickets reset on API restart.
+user_entered` and `status: unpaid`; they are not verified UNH citations. No real money is charged or real citation appealed. Like applications, tickets reset on API restart.
+
+## Prototype payment and appeal
+
+Select unpaid tickets, choose Pay selected or Appeal selected, review the numbers
+and total, and confirm. Appeals also require an explanation. The result records
+Paid or Appeal pending and retains a confirmation accessible from each ticket.
+Download confirmation exports plain text with the prototype disclaimer. No card
+information is requested and no external payment or appeal service is contacted.
+
+`POST /ticket-actions` accepts ticket IDs, action (`pay`/`appeal`), reviewed total
+in cents, explanation, and a UUID request ID. The API validates all selected tickets
+before changing any status. Already-resolved tickets and stale totals are rejected.
+Same-request retries recover the original confirmation without a second action.

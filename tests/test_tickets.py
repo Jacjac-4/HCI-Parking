@@ -13,12 +13,14 @@ class TicketTests(unittest.TestCase):
     def setUp(self):
         ticket_api.TICKETS.clear()
         ticket_api.REQUESTS.clear()
+        ticket_api.ACTIONS.clear()
         self.client = TestClient(app)
         self.body = dict(number=" ab-123 ", amount="12.34", reason=" Entered reason ", request_id=str(uuid4()))
 
     def tearDown(self):
         ticket_api.TICKETS.clear()
         ticket_api.REQUESTS.clear()
+        ticket_api.ACTIONS.clear()
         self.client.close()
 
     def test_empty_start_and_normalized_exact_search(self):
