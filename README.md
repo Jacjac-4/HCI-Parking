@@ -36,25 +36,47 @@ already has a different interpreter selected, use **Python: Select Interpreter**
 and select this repository's `.venv/bin/python`. When opening the parent CS 760
 folder, select `Design Sprint 2/HCI-Parking/.venv/bin/python`.
 
-## Demo application API
+## Permit planner and official data
 
-`GET /profile` returns a fictional commuter and saved vehicle. Permit options now
-include `eligible`, `eligibility_reason`, and `vehicle_requirement`; these sample
-rules and the starter prices are not official UNH policy.
+The application starts empty. Users enter their name, student year, residence,
+and vehicle; no runtime sample accounts, permits, announcements, or tickets are seeded.
+The five-step form retains entries when using Back/Edit, validates them, and saves
+local confirmations under My Parking. Reloading the form starts a new application.
 
-`POST /applications` accepts `permit_type_id`, a `vehicle` containing `plate`,
-two-letter `state`, and `vehicle_type` (`car` or `motorcycle`), plus a UUID
-`request_id`. Generate a new UUID for a new submission; reuse it with the same
-details when retrying an uncertain submission. A retry returns the original
-confirmation. Reusing the ID with different details returns 409.
+`unh_catalog.py` contains published Durham academic-year student permit categories,
+prices, eligibility guidance, and lot coverage checked October 14, 2026:
 
-Applications start `under_review` with `authorization: not_valid`. They do not
-purchase a permit, reserve inventory, or become approved when refreshed.
-`GET /applications` and `GET /applications/{id}` retrieve the saved records.
-The single-user data is in memory and resets when the API restarts. Run one API
-process for the demo. The UI will connect to these routes in the next chunk.
+- https://www.unh.edu/transportation/parking/permits/student
+- https://www.unh.edu/transportation/parking/parking-permits/permit-prices
+- https://www.unh.edu/transportation/parking/campus-parking-maps
 
-Run the API contract checks from the repository folder:
+Suggestions use self-reported answers, not verified UNH eligibility. Published
+prices exclude the $3.95 student online processing fee displayed during review.
+The official store requires sign-in for account-specific availability, lotteries,
+and waitlists: https://unh.thepermitstore.com/purchase.php. No live capacity,
+inventory, or approval information is fabricated. Summer, employee, and visitor
+permits remain on the official UNH site.
+
+## Local application API
+
+`GET /permit-types` and `GET /lots` return published reference information.
+`POST /applications` accepts `permit_type_id`, `applicant` (name, residence,
+year, commuter_eligible), `vehicle` (plate, two-letter state, car/motorcycle/moped),
+and a UUID `request_id`. Same-ID retries return the same confirmation; changed
+payloads with that ID return 409. The UI preserves the payload after an uncertain
+response, and pauses editing until Retry resolves the outcome.
+
+Saved records have `status: saved_locally` and `authorization: not_valid`.
+They are NOT submitted to UNH, purchased permits, or parking authorization.
+The confirmation links to the official store to complete a real order.
+`GET /applications` and `GET /applications/{id}` return only user-entered records.
+
+This is a single-user, local course application. Both servers bind to loopback.
+Records are held in memory and reset on API restart; no login or multi-user
+storage is implemented. Do not expose it as a shared service. Ticket payment,
+appeals, and guided help remain future implementation chunks.
+
+Run checks:
 
 ```sh
 .venv/bin/python -m unittest discover -s tests -v

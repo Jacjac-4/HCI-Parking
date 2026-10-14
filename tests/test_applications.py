@@ -12,12 +12,11 @@ import parking_api as api
 class ApplicationTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(api.app)
-        self.permits = copy.deepcopy(api.MY_PERMITS)
-        self.capacity = api.PERMIT_TYPES[0]["capacity"]
         api.APPLICATIONS.clear()
         api.APPLICATION_REQUESTS.clear()
         self.body = {
             "permit_type_id": 1,
+            "applicant": {"name": "Test User", "residence": "off_campus", "year": "continuing", "commuter_eligible": True},
             "vehicle": {"plate": " demo123 ", "state": "nh", "vehicle_type": "car"},
             "request_id": str(uuid4()),
         }
@@ -25,8 +24,6 @@ class ApplicationTests(unittest.TestCase):
     def tearDown(self):
         api.APPLICATIONS.clear()
         api.APPLICATION_REQUESTS.clear()
-        api.MY_PERMITS[:] = self.permits
-        api.PERMIT_TYPES[0]["capacity"] = self.capacity
         self.client.close()
 
     def submit(self, body=None):
@@ -36,15 +33,14 @@ class ApplicationTests(unittest.TestCase):
         response = self.submit()
         self.assertEqual(response.status_code, 200)
         record = response.json()
-        self.assertEqual(record["status"], "under_review")
+        self.assertEqual(record["status"], "saved_locally")
         self.assertEqual(record["authorization"], "not_valid")
         self.assertIsNone(record["permit_id"])
         self.assertEqual(record["vehicle"]["plate"], "DEMO123")
         self.assertEqual(record["vehicle"]["state"], "NH")
-        self.assertEqual(api.MY_PERMITS, self.permits)
         self.assertEqual(self.client.get('/applications/' + record["id"]).json(), record)
         self.assertEqual(self.client.get('/applications').json(), [record])
-        self.assertEqual(self.client.get('/applications/' + record["id"]).json()["status"], "under_review")
+        self.assertEqual(self.client.get('/applications/' + record["id"]).json()["status"], "saved_locally")
 
     def test_retry_returns_same_confirmation_and_changed_retry_is_rejected(self):
         first = self.submit().json()
@@ -79,30 +75,41 @@ class ApplicationTests(unittest.TestCase):
                 self.assertEqual(self.submit(body).status_code, 422)
         self.assertEqual(api.APPLICATIONS, [])
 
-    def test_eligibility_vehicle_and_capacity_are_enforced(self):
+    def test_eligibility_and_vehicle_are_enforced(self):
         self.body["permit_type_id"] = 3
         self.assertEqual(self.submit().status_code, 403)
-        self.body["permit_type_id"] = 5
+        self.body["permit_type_id"] = 8
         self.assertEqual(self.submit().status_code, 422)
         self.body["vehicle"]["vehicle_type"] = "motorcycle"
         self.assertEqual(self.submit().status_code, 200)
-        self.body["request_id"] = str(uuid4())
-        self.body["permit_type_id"] = 1
-        self.body["vehicle"]["vehicle_type"] = "car"
-        api.PERMIT_TYPES[0]["capacity"] = 0
-        self.assertEqual(self.submit().status_code, 409)
-        self.assertEqual(len(api.APPLICATIONS), 1)
 
-    def test_unknown_records_and_read_only_profile(self):
+    def test_empty_start_and_no_invented_inventory(self):
+        self.assertEqual(self.client.get('/applications').json(), [])
+        options = self.client.get('/permit-types').json()
+        self.assertIn("Lot A", options[0]["lots"])
+        self.assertNotIn("available", options[0])
+        self.assertNotIn("capacity", options[0])
+        self.assertEqual(self.client.post('/permits/purchase', json={"permit_type_id": 1}).status_code, 404)
         self.body["permit_type_id"] = 999
         self.assertEqual(self.submit().status_code, 404)
-        self.assertEqual(self.client.get('/applications/APP-9999').status_code, 404)
-        self.assertEqual(self.client.get('/profile').json()["category"], "commuter")
-        self.assertEqual(self.client.post('/profile', json={}).status_code, 405)
-        options = self.client.get('/permit-types').json()
-        self.assertFalse(next(p for p in options if p["id"] == 3)["eligible"])
-        self.assertIn("price", options[0])
-        self.assertIn("available", options[0])
+        self.assertEqual(self.client.get('/applications/unknown').status_code, 404)
+
+    def test_residence_year_and_commuter_requirements(self):
+        self.body["applicant"]["commuter_eligible"] = False
+        self.assertEqual(self.submit().status_code, 403)
+        self.body["permit_type_id"] = 2
+        self.body["applicant"].update(residence="gables", year="freshman")
+        self.assertEqual(self.submit().status_code, 403)
+        self.body["applicant"]["year"] = "continuing"
+        self.assertEqual(self.submit().status_code, 200)
+
+    def test_applicant_is_required_and_saved(self):
+        body = copy.deepcopy(self.body)
+        del body["applicant"]
+        self.assertEqual(self.submit(body).status_code, 422)
+        body["applicant"] = {**self.body["applicant"], "name": " "}
+        self.assertEqual(self.submit(body).status_code, 422)
+        self.assertEqual(self.submit().json()["applicant"], self.body["applicant"])
 
 
 if __name__ == '__main__':

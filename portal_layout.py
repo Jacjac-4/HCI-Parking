@@ -38,8 +38,8 @@ def page_layout(current_path: str):
                 ui.link("UNH Parking", "/").classes("site-title")
             with ui.dialog() as account_dialog, ui.card().classes("account-dialog"):
                 heading("My account", 2)
-                ui.label("Demo account")
-                ui.label("Sample parking records are used for this course project. Account details are not connected yet.")
+                ui.label("Local application planner")
+                ui.label("Enter your details in Find my permit. This local planner does not sign you into UNH; use the official permit store for your UNH account.")
                 ui.button("Close", on_click=account_dialog.close).props("no-caps unelevated")
             ui.button("My account", icon="person_outline", on_click=account_dialog.open).props(
                 "outline color=white no-caps"
@@ -51,7 +51,7 @@ def page_layout(current_path: str):
                     if path == current_path:
                         link.props('aria-current="page"')
     with ui.column().classes("site-width portal-content").props('id="main-content" tabindex="-1"'):
-        ui.label("COURSE PROJECT · DEMO DATA · NOT A LIVE UNH SERVICE").classes("demo-notice")
+        ui.label("COURSE PROJECT · LOCAL PLANNER · NOT CONNECTED TO UNH ACCOUNTS").classes("demo-notice")
         yield
     with ui.element("footer").classes("site-width portal-footer"):
         with ui.column().classes("footer-links"):
