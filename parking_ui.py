@@ -1,121 +1,180 @@
 """
 parking_ui.py
 
-A very simple NiceGUI frontend that pulls data from parking_api.py
-and renders a campus parking permit portal: browse lots, read
-announcements, and buy/cancel permits.
+NiceGUI parking portal with shared navigation and a task dashboard.
+Guided permit applications use the prototype API; ticket payments and appeals run inside the prototype.
 
 Run with:
     python -m pip install -r requirements.txt
     python parking_api.py     # in one terminal
     python parking_ui.py      # in another terminal
 
-Then http://localhost:8082 will open automatically
+Then open http://localhost:8082
 """
 
-import requests
-from nicegui import ui
+from urllib.parse import urlencode
+from pathlib import Path
 
-API_BASE = "http://localhost:8003"
+from nicegui import app, ui
+from parking_client import ApiError, request
 
-def api_get(path: str):
-    try:
-        resp = requests.get(f"{API_BASE}{path}", timeout=5)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.RequestException as e:
-        ui.notify(f"Could not reach API: {e}", type="negative")
-        return []
+from portal_layout import action_link, heading, page_layout
+from permit_flow import render_applications, render_permit_flow
+from ticket_flow import render_tickets
+from parking_maps import render_map
+from unh_catalog import PERMIT_TYPES, COMMUTER_RULE
 
-def api_post(path: str, json: dict):
-    try:
-        resp = requests.post(f"{API_BASE}{path}", json=json, timeout=5)
-        resp.raise_for_status()
-        return True
-    except requests.RequestException as e:
-        detail = ""
-        try:
-            detail = e.response.json().get("detail", "")
-        except Exception:
-            pass
-        ui.notify(detail or f"Request failed: {e}", type="negative")
-        return False
-
-
-def buy_permit(permit_type_id: int):
-    if api_post("/permits/purchase", {"permit_type_id": permit_type_id}):
-        ui.notify("Permit purchased", type="positive")
-        render_portal.refresh()
-
-
-def cancel_permit(permit_id: int):
-    if api_post("/permits/cancel", {"permit_id": permit_id}):
-        ui.notify("Permit cancelled", type="warning")
-        render_portal.refresh()
-
+app.add_static_files("/assets", Path(__file__).parent / "assets")
 
 @ui.page("/")
-def main_page():
-    render_portal()
+async def main_page():
+    with page_layout("/"):
+        try:
+            applications = await request("GET", "/applications")
+            render_dashboard(applications)
+        except ApiError:
+            render_dashboard([], status_unavailable=True)
 
 
-@ui.refreshable
-def render_portal():
-    ui.label("Campus Parking Portal").classes("text-2xl")
-
-    with ui.row().classes("w-full no-wrap"):
-        with ui.column().classes("w-1/2 p-2"):
-            render_lots()
-            render_announcements()
-        with ui.column().classes("w-1/2 p-2"):
-            render_permit_types()
-            render_my_permits()
+@ui.page("/permits")
+async def permits_page():
+    with page_layout("/permits"):
+        await render_permit_flow()
 
 
-def render_lots():
-    ui.label("Parking Lots").classes("text-lg")
-    lots = api_get("/lots")
-    for lot in lots:
-        ui.label(f'{lot["name"]} ({lot["zone"]}) - {lot["type"]} - {lot["total_spaces"]} spaces - {lot["hours"]}')
+@ui.page("/my-parking")
+async def my_parking_page():
+    with page_layout("/my-parking"):
+        heading("My Parking")
+        await render_applications()
 
 
-def render_announcements():
-    ui.label("Announcements").classes("text-lg")
-    announcements = api_get("/announcements")
-    for a in announcements:
-        ui.label(a["title"])
-        ui.label(a["body"])
-        ui.separator()
+@ui.page("/lots")
+def lots_page(permit_id: int = 0):
+    with page_layout("/"):
+        heading("Where can I park?")
+        render_lots(permit_id)
 
 
-def render_permit_types():
-    ui.label("Buy a Permit").classes("text-lg")
-    permit_types = api_get("/permit-types")
-    for pt in permit_types:
-        with ui.row().classes("items-center"):
-            ui.label(
-                f'{pt["name"]} - {pt["term"]} - ${pt["price"]} '
-                f'- {pt["available"]}/{pt["capacity"]} available'
-            )
-            ui.button(
-                "Buy Permit",
-                on_click=lambda pt_id=pt["id"]: buy_permit(pt_id),
-            )
+@ui.page("/tickets")
+async def tickets_page(ticket_number: str = ""):
+    with page_layout("/tickets"):
+        await render_tickets(ticket_number)
 
 
-def render_my_permits():
-    ui.label("My Permits").classes("text-lg")
-    my_permits = api_get("/my-permits")
-    if not my_permits:
-        ui.label("You don't have any permits yet.")
-        return
-    for p in my_permits:
-        with ui.row().classes("items-center"):
-            ui.label(f'{p["permit_type_name"]} - {p["zone"]} - ${p["price"]} - purchased {p["purchased"]}')
-            ui.button(
-                "Cancel",
-                on_click=lambda permit_id=p["id"]: cancel_permit(permit_id),
-            )
+@ui.page("/help")
+def help_page():
+    with page_layout("/help"):
+        heading("Parking help")
+        ui.label("Find student permit options under Permits and your saved information under My Parking.")
+        with ui.expansion("How do I apply for a permit?").classes("w-full"):
+            ui.label("Enter your student and residence information, choose a matching permit, add your vehicle, and review your details. Submit to receive an application confirmation.")
+            action_link("Find my permit", "/permits")
+        with ui.expansion("Does under review mean I can park?").classes("w-full"):
+            ui.label("No. Under review means your application was received, not approved. It does not authorize parking. This course prototype does not issue real permits.")
+            action_link("Check my applications", "/my-parking")
+        with ui.expansion("How do I pay or appeal a ticket?").classes("w-full"):
+            ui.label("Add your ticket number, amount, and reason. Select one or more unpaid tickets, choose Pay selected or Appeal selected, then review the tickets and total. Appeals require an explanation. Confirmations can be viewed and downloaded from the ticket record.")
+            ui.label("These actions change prototype records only; no real money or citation is involved.")
+            action_link("Manage tickets", "/tickets")
+        with ui.expansion("Will my information still be here later?").classes("w-full"):
+            ui.label("Submitted applications and tickets stay available while the server runs. Restarting the server clears them. Unsubmitted form details and ticket selections reset when you leave or reload the page.")
+        with ui.expansion("Am I eligible for a commuter permit?").classes("w-full"):
+            ui.label(COMMUTER_RULE)
+        with ui.expansion("Where can I park with my permit?").classes("w-full"):
+            ui.label("Choose your permit type to see its covered lots. Follow posted restrictions; a permit does not guarantee an open space.")
+            action_link("Find covered lots", "/lots")
+        with ui.expansion("How do I correct an application?").classes("w-full"):
+            ui.label("Use Edit before submitting. After submitting, open My Parking, withdraw the incorrect application, and start a new one.")
+            action_link("Manage applications", "/my-parking")
 
 
-ui.run(port=8082, title="Mock Parking Portal")
+def render_dashboard(applications, status_unavailable=False):
+    with ui.column().classes("page-intro"):
+        heading("My Parking")
+        ui.label("Find a permit, check your status, or manage a ticket.").classes("page-description")
+    with ui.element("div").classes("dashboard-grid"):
+        with ui.card().classes("task-card"):
+            heading("Get a parking permit", 2)
+            with ui.element("ol").classes("permit-steps").props('aria-label="Permit application steps"'):
+                for number, title in enumerate(("About you", "Permit", "Vehicle", "Review", "Confirmation"), 1):
+                    with ui.element("li"):
+                        ui.label(str(number)).classes("step-number")
+                        ui.label(title)
+            ui.label("See permit options, costs, and rules. Check your details before submitting.")
+            ui.label("Apply in five steps and track your application in My Parking.").classes("support-copy")
+            action_link("Find my permit", "/permits", primary=True)
+        with ui.card().classes("task-card"):
+            heading("My permit status", 2)
+            if status_unavailable:
+                ui.label("Status temporarily unavailable").classes("status-note")
+                ui.label("Open My Parking to retry. Your application may still be saved.")
+            elif applications:
+                latest = applications[-1]
+                ui.label(latest["permit_type_name"])
+                ui.label(latest["status"].replace("_", " ").upper()).classes("status-note")
+                ui.label(latest["status_explanation"])
+            else:
+                ui.label("No applications yet").classes("status-note")
+                ui.label("Start with Find my permit. Your submitted application's status will appear here.")
+            ui.label("An application alone does not authorize parking.").classes("support-copy")
+            action_link("View status and next steps", "/my-parking")
+        with ui.card().classes("task-card"):
+            heading("Where can I park?", 2)
+            ui.label("Choose a permit to see covered lots and a campus map.")
+            lot_choice = ui.select({p["id"]: p["name"] for p in PERMIT_TYPES}, label="Permit type",
+                                   on_change=lambda: map_preview.refresh()).props("outlined").classes("w-full")
+
+            @ui.refreshable
+            def map_preview():
+                permit = next((p for p in PERMIT_TYPES if p["id"] == lot_choice.value), None)
+                if permit:
+                    render_map(permit, preview=True)
+                    action_link("View lots and map", f'/lots?permit_id={permit["id"]}')
+                else:
+                    with ui.element("div").classes("map-access"):
+                        ui.icon("map").props('aria-hidden="true"')
+                        ui.label("Select a permit to preview its map")
+                    action_link("View lots and map", "/lots")
+            map_preview()
+        with ui.card().classes("task-card"):
+            heading("Pay or appeal a ticket", 2)
+            with ui.element("div").classes("ticket-search"):
+                ticket = ui.input("Ticket number").props("outlined maxlength=40")
+
+                def open_ticket():
+                    number = (ticket.value or "").strip()
+                    if not number:
+                        ticket.error = "Enter a ticket number."
+                        return
+                    ui.navigate.to("/tickets?" + urlencode({"ticket_number": number}))
+
+                ticket.on("keydown.enter", open_ticket)
+                ui.button("Search", on_click=open_ticket).props("no-caps unelevated")
+            ui.label("Search tickets you have entered, or open Tickets to add one.").classes("support-copy")
+            ui.label("Select tickets, review their total, then pay or appeal. Keep your confirmation.")
+
+
+def render_lots(permit_id=0):
+    ui.label("Durham campus · Academic-year student permits")
+    ui.label("Select a permit to see its published parking coverage. Follow posted signs and UNH parking regulations; this page does not show live space availability.")
+    selection = ui.select({p["id"]: p["name"] for p in PERMIT_TYPES}, label="Permit type", value=permit_id if any(p["id"] == permit_id for p in PERMIT_TYPES) else None, on_change=lambda: coverage.refresh()).props("outlined").classes("w-full")
+
+    @ui.refreshable
+    def coverage():
+        permit = next((p for p in PERMIT_TYPES if p["id"] == selection.value), None)
+        if not permit:
+            ui.label("Choose your permit type to view covered lots.")
+            return
+        with ui.card().classes("task-card w-full"):
+            heading(permit["name"], 2)
+            for lot in permit["lots"]:
+                ui.label(lot)
+            ui.label(permit["eligibility_reason"])
+            render_map(permit)
+    coverage()
+    ui.label("Source checked October 14, 2026. Summer, visitor, and employee parking have different rules.").classes("support-copy")
+
+
+
+ui.run(host="127.0.0.1", port=8082, title="UNH Parking", show=False)
