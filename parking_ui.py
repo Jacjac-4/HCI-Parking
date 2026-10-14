@@ -19,6 +19,7 @@ from parking_client import ApiError, request
 
 from portal_layout import action_link, heading, page_layout
 from permit_flow import render_applications, render_permit_flow
+from ticket_flow import render_tickets
 from unh_catalog import PERMIT_TYPES, COMMUTER_RULE
 
 @ui.page("/")
@@ -52,13 +53,9 @@ def lots_page(permit_id: int = 0):
 
 
 @ui.page("/tickets")
-def tickets_page(ticket_number: str = ""):
+async def tickets_page(ticket_number: str = ""):
     with page_layout("/tickets"):
-        heading("Pay or appeal a ticket")
-        if ticket_number:
-            ui.label(f"Ticket number: {ticket_number}")
-        ui.label("Ticket lookup, payment, and appeals are not available in this version yet.")
-        action_link("Back to home", "/")
+        await render_tickets(ticket_number)
 
 
 @ui.page("/help")
@@ -134,8 +131,8 @@ def render_dashboard(applications, status_unavailable=False):
 
                 ticket.on("keydown.enter", open_ticket)
                 ui.button("Search", on_click=open_ticket).props("no-caps unelevated")
-            ui.label("Ticket lookup is not connected yet. Your number will carry over to the ticket page.").classes("support-copy")
-            ui.label("Review selected tickets and the total before paying. Keep your receipt.")
+            ui.label("Search tickets you have entered, or open Tickets to add one.").classes("support-copy")
+            ui.label("Select saved tickets and review their total. Payment and appeal actions are coming next.")
 
 
 def render_lots(permit_id=0):

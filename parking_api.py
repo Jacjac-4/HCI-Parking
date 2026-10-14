@@ -8,8 +8,10 @@ from fastapi import FastAPI, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from unh_catalog import LOTS, PERMIT_TYPES, eligible
+from ticket_api import router as ticket_router
 
 app = FastAPI(title="Parking prototype")
+app.include_router(ticket_router)
 APPLICATIONS = []
 APPLICATION_REQUESTS = {}
 application_lock = RLock()

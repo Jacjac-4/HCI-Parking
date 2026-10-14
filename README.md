@@ -76,7 +76,7 @@ Both states retain `authorization: not_valid`; refresh never approves a permit.
 
 This is a single-user local prototype. Servers bind to loopback. Records are
 in memory and reset on API restart; no authentication or durable storage is
-implemented. Run one API process. Ticket interactions and a geographic map are
+implemented. Run one API process. Prototype payments, appeals, and a geographic map are
 not implemented in this chunk. Parking help is a guided FAQ, not an AI chatbot.
 
 ## Checks
@@ -88,3 +88,18 @@ not implemented in this chunk. Parking help is a guided FAQ, not an AI chatbot.
 Browser checks should cover entering details, reviewing and submitting, visiting
 My Parking, opening covered lots, cancelling a withdrawal, confirming withdrawal,
 and navigating help. Clear any temporary test records by restarting the API.
+
+## Ticket entry and selection
+
+Tickets starts empty. Add a ticket number, amount, and reason, then search by
+exact ticket number (case-insensitive) or show all saved tickets. Checkboxes select
+multiple tickets; the summary lists every selected ticket and sums integer cents,
+including selections hidden by the current search. Clear selection resets the total.
+Selections belong to the current page and reset on navigation or reload.
+
+`POST /tickets` accepts `number`, decimal `amount`, `reason`, and UUID `request_id`.
+It normalizes ticket numbers, rejects duplicates and invalid amounts, and returns
+the same record for same-request retries. `GET /tickets` lists entered records;
+optional `number` filters by exact normalized number. Tickets have `source:
+user_entered` and `status: unpaid`; they are not verified UNH citations. Nothing is
+charged or appealed in this chunk. Like applications, tickets reset on API restart.
