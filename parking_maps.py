@@ -1,4 +1,10 @@
 """Local copies of UNH's published maps, paired with the permit coverage list."""
+# Map artwork: University of New Hampshire Transportation, downloaded October 14, 2026.
+# Source page: https://www.unh.edu/transportation/parking/permits/student
+# commuter.jpg: https://www.unh.edu/transportation/sites/default/files/media/2026-06/Commuter_2627.jpg
+# resident-core.jpg: https://www.unh.edu/transportation/sites/default/files/media/2026-06/Resident%20Core.JPG
+# resident-west.jpg: https://www.unh.edu/transportation/sites/default/files/media/2026-06/Resident%20West_2627.jpg
+# motorcycle-moped.jpg: https://www.unh.edu/transportation/sites/default/files/media/2026-06/MC_Moped_2627.jpg
 from nicegui import ui
 
 MAP_FILES = {
