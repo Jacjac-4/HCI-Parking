@@ -1,0 +1,29 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{browser_title} | Parking 4 UNH</title>
+  <link rel="stylesheet" href="/ds3/styles.css">
+  <script type="module" src="/ds3/portal.js"></script>
+</head>
+<body data-page="{page}">
+  <a class="skip" href="#main">Skip to main content</a>
+  <header class="masthead"><div class="wrap brand">
+    <span class="university">University of New Hampshire</span>
+    {brand}
+  </div></header>
+  <div class="nav-bar"><nav class="wrap" aria-label="Main navigation">{navigation}
+  </nav></div>
+  <main class="wrap" id="main" tabindex="-1">
+    <h1>{title}</h1>
+    {intro}
+    <p id="status" role="status"></p>
+    <div id="content"></div>
+  </main>
+  <footer class="wrap portal-footer">
+    <a href="/ds3/lots">Permit rules and lot information</a>
+    {footer_help}
+  </footer>
+</body>
+</html>

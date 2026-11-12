@@ -4,14 +4,20 @@ from threading import RLock
 from typing import Literal
 from uuid import UUID
 
+from pathlib import Path
+
 from fastapi import FastAPI, HTTPException
+from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, Field
 
 from unh_catalog import LOTS, PERMIT_TYPES, eligible
 from ticket_api import router as ticket_router
+from ds3.web import router as ds3_router
 
 app = FastAPI(title="Parking prototype")
 app.include_router(ticket_router)
+app.include_router(ds3_router)
+app.mount("/ds3-assets", StaticFiles(directory=Path(__file__).with_name("assets")), name="ds3-assets")
 APPLICATIONS = []
 APPLICATION_REQUESTS = {}
 application_lock = RLock()
@@ -54,6 +60,12 @@ def _get_permit_type_or_404(permit_type_id: int) -> dict:
         if pt["id"] == permit_type_id:
             return pt
     raise HTTPException(status_code=404, detail="Permit type not found")
+
+
+@app.post("/permit-matches")
+def permit_matches(applicant: Applicant):
+    answers = applicant.model_dump()
+    return [permit for permit in PERMIT_TYPES if eligible(permit["id"], answers)]
 
 
 @app.get("/applications")
