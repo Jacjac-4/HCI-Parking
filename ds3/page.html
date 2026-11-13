@@ -7,6 +7,18 @@
   <link rel="stylesheet" href="/ds3/styles.css">
   <script type="module" src="/ds3/portal.js"></script>
 </head>
+<!-- Popup shared by every page using this template -->
+<dialog id="parking-help-dialog" aria-labelledby="parking-help-title">
+  <h2 id="parking-help-title">Parking Help</h2>
+  <p>What do you need help with?</p>
+  <p>
+    Get help with permit applications, application status,
+    covered lots, and parking tickets.
+  </p>
+  <form method="dialog">
+    <button type="submit" autofocus>Close</button>
+  </form>
+</dialog>
 <body data-page="{page}">
   <a class="skip" href="#main">Skip to main content</a>
   <header class="masthead"><div class="wrap brand">

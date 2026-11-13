@@ -566,3 +566,12 @@ start().catch(error => {
   status.textContent = "Unable to load this page. " + error.message;
   content.append(action("Reload page", () => location.reload()));
 });
+
+const helpDialog = document.querySelector("#parking-help-dialog");
+const helpButtons = document.querySelectorAll('a[href="/ds3/help"]');
+helpButtons.forEach(button => {
+  button.addEventListener("click", event => {
+    event.preventDefault();
+    helpDialog.showModal();
+  });
+});
