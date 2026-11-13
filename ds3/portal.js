@@ -546,8 +546,90 @@ async function help() {
     faq("How do I find a ticket?", "Enter the ticket number shown on the citation. If you have not added the ticket yet, enter its details first.", link("Find or add a ticket", "/ds3/tickets")),
     faq("How do I review a payment or appeal?", "Select the tickets, verify the total and review the details before recording your action. Open the ticket record to find its confirmation."));
   ticketHelp.id = "tickets";
-  content.append(permitHelp, ticketHelp, card(heading("Contact Parking Services"),
-    link("Find written contact options at UNH Transportation", "https://www.unh.edu/transportation/parking")));
+    // A written support option for users who cannot or prefer not to call.
+  // This prototype does not send or store messages.
+  const contactForm = element("form");
+
+  const emailInput = element("input", {
+    id: "help-contact-email",
+    type: "email",
+    name: "email",
+    autocomplete: "email",
+    required: "",
+  });
+
+  const messageInput = element("textarea", {
+    id: "help-contact-message",
+    name: "message",
+    rows: "5",
+    required: "",
+  });
+
+  const submitButton = element(
+    "button",
+    { type: "submit" },
+    "Submit message (demo)"
+  );
+
+  // Screen readers announce the confirmation when its text changes.
+  const confirmation = element("p", {
+    role: "status",
+    "aria-live": "polite",
+  });
+
+  contactForm.append(
+    element("label", { for: "help-contact-email" }, "Your email address"),
+    emailInput,
+    element("label", { for: "help-contact-message" }, "How can we help?"),
+    messageInput,
+    submitButton,
+    confirmation
+  );
+
+  contactForm.addEventListener("submit", event => {
+    // Prevent a page reload or actual form submission.
+    event.preventDefault();
+
+    // Reject messages that contain only spaces.
+    if (!messageInput.value.trim()) {
+      messageInput.setCustomValidity("Please enter your question.");
+      messageInput.reportValidity();
+      return;
+    }
+
+    // Simulate the response without sending or saving anything.
+    confirmation.textContent =
+      "Demo only: your message has not been sent or saved. " +
+      "In the completed service, Parking Services would reply by email " +
+      "using the address you provided.";
+  });
+
+  // Clear the custom error when the user edits their message.
+  messageInput.addEventListener("input", () => {
+    messageInput.setCustomValidity("");
+    confirmation.textContent = "";
+  });
+
+  content.append(
+    permitHelp,
+    ticketHelp,
+    card(
+      heading("Contact Parking Services"),
+      paragraph(
+        "Ask about permit eligibility, payment problems, or appeals " +
+        "using written support. No phone call is needed for this option."
+      ),
+      paragraph(
+        "Prototype only: this form demonstrates email support. " +
+        "Messages are not sent or saved, and you will not receive a reply."
+      ),
+      contactForm,
+      link(
+        "Visit the official UNH Parking website",
+        "https://www.unh.edu/transportation/parking"
+      )
+    )
+  );
   if (location.hash === "#permits" || location.hash === "#tickets") document.getElementById(location.hash.slice(1)).scrollIntoView();
 }
 
@@ -566,3 +648,62 @@ start().catch(error => {
   status.textContent = "Unable to load this page. " + error.message;
   content.append(action("Reload page", () => location.reload()));
 });
+
+
+const helpDialog = document.querySelector("#parking-help-dialog");
+const footerHelpButton = document.querySelector(
+  '.portal-footer a[href="/ds3/help"]'
+);
+
+if (footerHelpButton && helpDialog) {
+  footerHelpButton.textContent = "Need parking help?";
+
+  const title = document.createElement("h2");
+  title.id = "parking-help-title";
+  title.textContent = "Parking Help";
+
+  const helpPage = document.createElement("iframe");
+  helpPage.addEventListener("load", () => {
+    const helpDocument = helpPage.contentDocument;
+  
+    if (!helpDocument) return;
+  
+    const popupStyles = helpDocument.createElement("style");
+    popupStyles.textContent = `
+      .masthead,
+      .nav-bar,
+      .portal-footer,
+      .skip {
+        display: none;
+      }
+  
+      main.wrap {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 1rem;
+        box-sizing: border-box;
+      }
+    `;
+  
+    helpDocument.head.appendChild(popupStyles);
+  });
+  helpPage.src = "/ds3/help";
+  helpPage.title = "Parking frequently asked questions";
+  helpPage.style.width = "100%";
+  helpPage.style.height = "60vh";
+  helpPage.style.border = "0";
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.textContent = "Close";
+  closeButton.addEventListener("click", () => helpDialog.close());
+
+  helpDialog.replaceChildren(title, helpPage, closeButton);
+
+  footerHelpButton.addEventListener("click", event => {
+    event.preventDefault();
+    helpDialog.showModal();
+    closeButton.focus();
+  });
+}
