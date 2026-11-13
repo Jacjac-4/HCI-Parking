@@ -567,11 +567,61 @@ start().catch(error => {
   content.append(action("Reload page", () => location.reload()));
 });
 
+
 const helpDialog = document.querySelector("#parking-help-dialog");
-const helpButtons = document.querySelectorAll('a[href="/ds3/help"]');
-helpButtons.forEach(button => {
-  button.addEventListener("click", event => {
+const footerHelpButton = document.querySelector(
+  '.portal-footer a[href="/ds3/help"]'
+);
+
+if (footerHelpButton && helpDialog) {
+  footerHelpButton.textContent = "Need parking help?";
+
+  const title = document.createElement("h2");
+  title.id = "parking-help-title";
+  title.textContent = "Parking Help";
+
+  const helpPage = document.createElement("iframe");
+  helpPage.addEventListener("load", () => {
+    const helpDocument = helpPage.contentDocument;
+  
+    if (!helpDocument) return;
+  
+    const popupStyles = helpDocument.createElement("style");
+    popupStyles.textContent = `
+      .masthead,
+      .nav-bar,
+      .portal-footer,
+      .skip {
+        display: none;
+      }
+  
+      main.wrap {
+        width: 100%;
+        max-width: none;
+        margin: 0;
+        padding: 1rem;
+        box-sizing: border-box;
+      }
+    `;
+  
+    helpDocument.head.appendChild(popupStyles);
+  });
+  helpPage.src = "/ds3/help";
+  helpPage.title = "Parking frequently asked questions";
+  helpPage.style.width = "100%";
+  helpPage.style.height = "60vh";
+  helpPage.style.border = "0";
+
+  const closeButton = document.createElement("button");
+  closeButton.type = "button";
+  closeButton.textContent = "Close";
+  closeButton.addEventListener("click", () => helpDialog.close());
+
+  helpDialog.replaceChildren(title, helpPage, closeButton);
+
+  footerHelpButton.addEventListener("click", event => {
     event.preventDefault();
     helpDialog.showModal();
+    closeButton.focus();
   });
-});
+}
