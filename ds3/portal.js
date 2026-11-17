@@ -127,12 +127,11 @@ async function permits() {
       paragraph(commuterRule));
     function updateCommuter() {
       commuterField.hidden = residence.value !== "off_campus";
-      if (commuterField.hidden) commuter.checked = false;
     }
     residence.addEventListener("change", updateCommuter);
     updateCommuter();
     const { form, submit } = formFor(async () => {
-      Object.assign(answers, { name: name.value.trim(), residence: residence.value, year: year.value, commuter_eligible: commuter.checked });
+      Object.assign(answers, { name: name.value.trim(), residence: residence.value, year: year.value, commuter_eligible: !commuterField.hidden && commuter.checked });
       if (!answers.name) {
         name.setCustomValidity("Enter your name.");
         validate(form);
@@ -365,14 +364,15 @@ async function tickets() {
   const search = ticketField("ticket-search", filter);
   const searchButton = element("button", { type: "submit" }, "Search tickets");
   const searchForm = element("form", { novalidate: "" },
-    field("Ticket number", search, "Enter the number printed on your ticket."), searchButton,
-    action("Show all tickets", () => {
-      search.value = "";
-      filter = "";
-      search.removeAttribute("aria-invalid");
-      document.getElementById("ticket-search-error").textContent = "";
-      render();
-    }));
+    field("Ticket number", search, "Enter the number printed on your ticket."),
+    element("div", { class: "actions" }, searchButton,
+      action("Show all tickets", () => {
+        search.value = "";
+        filter = "";
+        search.removeAttribute("aria-invalid");
+        document.getElementById("ticket-search-error").textContent = "";
+        render();
+      })));
   searchForm.addEventListener("submit", event => {
     event.preventDefault();
     if (!validate(searchForm)) return;
@@ -643,6 +643,11 @@ async function start() {
     case "home": return dashboard();
   }
 }
+
+document.querySelector(".skip")?.addEventListener("click", event => {
+  event.preventDefault();
+  document.querySelector("#main")?.focus();
+});
 
 start().catch(error => {
   status.textContent = "Unable to load this page. " + error.message;

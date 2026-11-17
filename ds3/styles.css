@@ -4,23 +4,25 @@ body { margin: 0; line-height: 1.55; }
 .wrap { width: min(100% - 2rem, 56rem); margin-inline: auto; }
 header { background: #041e42; padding: 1rem 0; }
 header a { color: white; font-weight: 700; font-size: 1.5rem; }
-nav, .actions { display: flex; flex-wrap: wrap; gap: .75rem; align-items: center; }
+nav, .actions { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
 nav { padding-block: .75rem; }
-nav a { padding: .35rem .55rem; }
+nav a { padding: .35rem .55rem; min-height: 44px; display: inline-flex; align-items: center; }
 [aria-current="page"] { background: #dbe7f6; font-weight: bold; }
 main { padding-block: 1rem 3rem; }
 h1, h2, h3 { line-height: 1.2; }
 a { color: #123d73; }
-:focus-visible { outline: 3px solid #1260ad; outline-offset: 3px; }
-header :focus-visible { outline-color: #ffd773; }
-.skip { position: absolute; top: 0; left: 1rem; background: white; padding: .5rem; transform: translateY(-150%); }
-.skip:focus { transform: none; }
+:focus, :focus-visible { outline: 3px solid #1260ad; outline-offset: 3px; box-shadow: 0 0 0 2px white, 0 0 0 5px #1260ad; }
+header :focus, header :focus-visible { outline-color: #ffd773; box-shadow: 0 0 0 2px #041e42, 0 0 0 5px #ffd773; }
+.skip { position: fixed; top: .5rem; left: 1rem; background: white; padding: .6rem 1rem; min-height: 44px; display: inline-flex; align-items: center; font-weight: 650; border: 2px solid #041e42; border-radius: .25rem; transform: translateY(-200%); }
+.skip:focus, .skip:focus-visible { transform: none; }
 .card { margin-block: 1rem; padding: clamp(1rem, 4vw, 1.75rem); background: white; border: 1px solid #aabaca; border-radius: .5rem; overflow-wrap: anywhere; }
 .field { margin-block: 1rem; }
 label { display: block; font-weight: 600; }
+label:has(input[type=checkbox]) { min-height: 44px; display: inline-flex; align-items: center; gap: .5rem; cursor: pointer; }
 input, select, button { font: inherit; }
-input:not([type=checkbox]), select { display: block; width: min(100%, 34rem); padding: .5rem; border: 1px solid #60758a; border-radius: .25rem; color: inherit; background: white; }
-button { min-height: 44px; padding: .5rem .85rem; border: 1px solid #041e42; border-radius: .25rem; background: #041e42; color: white; cursor: pointer; }
+input[type=checkbox] { width: 1.25rem; height: 1.25rem; cursor: pointer; }
+input:not([type=checkbox]), select { display: block; width: min(100%, 34rem); min-height: 44px; padding: .5rem; border: 1px solid #60758a; border-radius: .25rem; color: inherit; background: white; }
+button { min-height: 44px; min-width: 44px; padding: .5rem .85rem; border: 1px solid #041e42; border-radius: .25rem; background: #041e42; color: white; cursor: pointer; }
 button:disabled { opacity: .7; cursor: default; }
 .error { color: #9c231d; }
 .error:empty, #status:empty { margin: 0; }
@@ -74,7 +76,7 @@ h3 { color: var(--navy); }
 }
 
 textarea { display: block; font: inherit; width: min(100%, 34rem); padding: .5rem; border: 1px solid #60758a; border-radius: .25rem; }
-summary { cursor: pointer; padding-block: .6rem; font-weight: 650; }
+summary { cursor: pointer; padding-block: .65rem; font-weight: 650; min-height: 44px; }
 dialog { width: min(calc(100% - 2rem), 34rem); max-height: calc(100% - 2rem); padding: 1.5rem; border: 1px solid var(--line); border-radius: .35rem; color: inherit; }
 dialog::backdrop { background: rgb(4 30 66 / 55%); }
 .record-summary { display: grid; grid-template-columns: auto 1fr; gap: .25rem 1rem; }
