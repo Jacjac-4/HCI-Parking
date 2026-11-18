@@ -118,7 +118,7 @@ def submit_application(req: ApplicationRequest):
             "status": "under_review",
             "authorization": "not_valid",
             "status_explanation": "Application received; not yet approved. This application does not authorize parking.",
-            "next_action": "Review your application details in My Parking. You can withdraw an incorrect application and submit a corrected one.",
+            "next_action": "Review your application details in My Applications. You can withdraw an incorrect application and submit a corrected one.",
             "permit_id": None,
         }
         APPLICATIONS.append(application)

@@ -9,9 +9,9 @@ from unh_catalog import COMMUTER_RULE, RESIDENCES
 router = APIRouter(prefix="/ds3")
 directory = Path(__file__).resolve().parent
 pages = (
-    ("", "Home", "My Parking"),
-    ("/permits", "Permits", "Find my permit"),
-    ("/my-parking", "My Parking", "My Parking"),
+    ("", "Home", "Parking Services"),
+    ("/permits", "Apply for a Permit", "Apply for a Permit"),
+    ("/my-parking", "View Permit Applications", "My Applications"),
     ("/lots", "Covered lots", "Covered lots"),
     ("/tickets", "Tickets", "Parking tickets"),
     ("/help", "Parking Help", "Parking Help"),
@@ -48,5 +48,5 @@ def page(page: str = ""):
         title=title, browser_title="Home" if not page else title, navigation="".join(nav), page=page or "home",
         brand='<a href="/ds3/">UNH Parking</a>' if page else '<strong class="brand-title">UNH Parking</strong>',
         footer_help='' if page == "help" else '<a class="button-link primary" href="/ds3/help">Parking Help</a>',
-        intro='<p class="page-intro">Find a permit, check your status, or manage a ticket.</p>' if not page else "",
+        intro='<p class="page-intro">Apply for parking permits, track application status, find parking locations, and manage tickets.</p>' if not page else "",
     )
