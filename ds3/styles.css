@@ -5,12 +5,15 @@ body { margin: 0; line-height: 1.55; }
 header { background: #041e42; padding: 1rem 0; }
 header a { color: white; font-weight: 700; font-size: 1.5rem; }
 nav, .actions { display: flex; flex-wrap: wrap; gap: 1rem; align-items: center; }
+.actions { margin-top: .75rem; }
+.submit-actions { margin-top: 1.25rem; padding-top: 1rem; border-top: 1px solid var(--line); }
 nav { padding-block: .75rem; }
 nav a { padding: .35rem .55rem; min-height: 44px; display: inline-flex; align-items: center; }
 [aria-current="page"] { background: #dbe7f6; font-weight: bold; }
 main { padding-block: 1rem 3rem; }
 h1, h2, h3 { line-height: 1.2; }
 a { color: #123d73; }
+main a:not(.button-link), .portal-footer a:not(.button-link) { display: inline-flex; align-items: center; min-height: 44px; padding-block: .35rem; }
 :focus, :focus-visible { outline: 3px solid #1260ad; outline-offset: 3px; box-shadow: 0 0 0 2px white, 0 0 0 5px #1260ad; }
 header :focus, header :focus-visible { outline-color: #ffd773; box-shadow: 0 0 0 2px #041e42, 0 0 0 5px #ffd773; }
 .skip { position: fixed; top: .5rem; left: 1rem; background: white; padding: .6rem 1rem; min-height: 44px; display: inline-flex; align-items: center; font-weight: 650; border: 2px solid #041e42; border-radius: .25rem; transform: translateY(-200%); }
@@ -23,6 +26,8 @@ input, select, button { font: inherit; }
 input[type=checkbox] { width: 1.25rem; height: 1.25rem; cursor: pointer; }
 input:not([type=checkbox]), select { display: block; width: min(100%, 34rem); min-height: 44px; padding: .5rem; border: 1px solid #60758a; border-radius: .25rem; color: inherit; background: white; }
 button { min-height: 44px; min-width: 44px; padding: .5rem .85rem; border: 1px solid #041e42; border-radius: .25rem; background: #041e42; color: white; cursor: pointer; }
+button.secondary { background: white; color: #041e42; }
+button.secondary:hover:not(:disabled) { background: #edf1f6; }
 button:disabled { opacity: .7; cursor: default; }
 .error { color: #9c231d; }
 .error:empty, #status:empty { margin: 0; }
