@@ -23,8 +23,8 @@ function progress(current) {
 }
 
 const heading = text => element("h2", { tabindex: "-1" }, text);
-const action = (text, handler) => {
-  const button = element("button", { type: "button" }, text);
+const action = (text, handler, secondary = false) => {
+  const button = element("button", { type: "button", ...(secondary ? { class: "secondary" } : {}) }, text);
   button.addEventListener("click", handler);
   return button;
 };
@@ -46,7 +46,9 @@ function field(label, control, hint = "") {
   const error = element("p", { id: control.id + "-error", class: "error" });
   const description = element("p", { id: control.id + "-hint" }, hint);
   control.setAttribute("aria-describedby", [hint && description.id, error.id].filter(Boolean).join(" "));
-  const wrapper = element("div", { class: "field" }, element("label", { for: control.id }, label), control);
+  const wrapper = control.type === "checkbox"
+    ? element("div", { class: "field" }, element("label", { for: control.id }, control, " " + label))
+    : element("div", { class: "field" }, element("label", { for: control.id }, label), control);
   if (hint) wrapper.append(description);
   wrapper.append(error);
   return wrapper;
@@ -88,10 +90,17 @@ function showStep(title, body, moveFocus) {
 async function permits() {
   const { residences, commuter_rule: commuterRule } = await api("/ds3/permit-form-options");
   const answers = { name: "", residence: "", year: "", commuter_eligible: false };
-  const vehicle = { plate: "", state: "" };
+  const vehicle = { plate: "", state: "", vehicle_type: "" };
   let matches = [];
   let chosen;
   let request;
+  let reviewedKey = "";
+  const reviewKey = () => JSON.stringify({ answers, vehicle, permit_id: chosen?.id });
+
+  function vehicleTypesFor(permit) {
+    const raw = permit?.vehicle_requirements ?? permit?.vehicle_requirement ?? "";
+    return Array.isArray(raw) ? raw : String(raw).split(/\s*(?:,|\/|\bor\b)\s*/i).filter(Boolean);
+  }
 
   function formFor(handler, label = "Continue") {
     const form = element("form", { novalidate: "" });
@@ -151,7 +160,7 @@ async function permits() {
         ? "The academic-year student permits in this prototype have no match for freshmen who live on campus. Off-campus freshmen may qualify for other options."
         : "No academic-year student permits match these answers.";
       showStep("Step 2 of 5: No matching permits", element("div", {}, paragraph(explanation),
-        element("div", { class: "actions" }, action("Edit about you", () => about()),
+        element("div", { class: "actions" }, action("Edit about you", () => about(), true),
           link("Parking Help for permits", "/ds3/help#permits"))), true);
       return;
     }
@@ -161,30 +170,54 @@ async function permits() {
       vehicleStep();
     });
     form.append(field("Permit type", picker, "Eligibility is reviewed after you apply."),
-      element("div", { class: "actions" }, action("Back", () => about()), submit));
+      element("div", { class: "actions" }, action("Back", () => about(), true), submit));
     showStep("Step 2 of 5: Permit", form, true);
   }
 
   function vehicleStep() {
     const plate = element("input", { id: "plate", required: "", maxlength: "10", pattern: "[A-Za-z0-9][A-Za-z0-9 \\-]*" });
     const state = element("input", { id: "state", required: "", maxlength: "2", pattern: "[A-Za-z]{2}" });
+    const validTypes = vehicleTypesFor(chosen);
+    const singleType = validTypes.length === 1;
+    const vehicleType = singleType ? null : select(
+      "vehicle-type",
+      validTypes.map(type => [type, type[0].toUpperCase() + type.slice(1)]),
+      validTypes.includes(vehicle.vehicle_type) ? vehicle.vehicle_type : ""
+    );
     plate.value = vehicle.plate;
     state.value = vehicle.state;
     const { form, submit } = formFor(() => {
-      Object.assign(vehicle, { plate: plate.value.trim().toUpperCase(), state: state.value.toUpperCase() });
+      const chosenType = singleType ? validTypes[0] : vehicleType.value;
+      if (!validTypes.includes(chosenType)) {
+        vehicleType?.setCustomValidity("Choose a compatible vehicle type for this permit.");
+        validate(form);
+        return;
+      }
+      Object.assign(vehicle, { plate: plate.value.trim().toUpperCase(), state: state.value.toUpperCase(), vehicle_type: chosenType });
       review();
     });
-    form.append(paragraph(chosen.name + " requires a " + chosen.vehicle_requirement + "."),
+    vehicleType?.addEventListener("change", () => vehicleType.setCustomValidity(""));
+    form.append(
+      paragraph(singleType ? chosen.name + " requires a " + validTypes[0] + "." : chosen.name + " allows: " + validTypes.join(", ") + "."),
       field("License plate", plate, "Enter up to 10 letters, numbers, spaces, or hyphens."),
       field("State", state, "Enter a two-letter state code, such as NH."),
-      element("div", { class: "actions" }, action("Back", options), submit));
+      ...(vehicleType ? [field("Vehicle type", vehicleType)] : []),
+      element("div", { class: "actions" }, action("Back", options, true), submit)
+    );
     showStep("Step 3 of 5: Vehicle", form, true);
   }
 
   function review() {
+    const validTypes = vehicleTypesFor(chosen);
+    if (!validTypes.includes(vehicle.vehicle_type)) vehicle.vehicle_type = validTypes[0] || chosen.vehicle_requirement;
+    const currentKey = reviewKey();
     const confirm = element("input", { id: "reviewed", type: "checkbox", required: "" });
+    confirm.checked = reviewedKey === currentKey;
+    confirm.addEventListener("change", () => {
+      reviewedKey = confirm.checked ? currentKey : "";
+    });
     const { form, submit } = formFor(async () => {
-      const payload = { applicant: { ...answers }, vehicle: { ...vehicle, vehicle_type: chosen.vehicle_requirement }, permit_type_id: chosen.id };
+      const payload = { applicant: { ...answers }, vehicle: { ...vehicle }, permit_type_id: chosen.id };
       const key = JSON.stringify(payload);
       if (request?.key !== key) request = { key, id: crypto.randomUUID() };
       const record = await api("/applications", { ...payload, request_id: request.id });
@@ -195,11 +228,12 @@ async function permits() {
     form.append(element("dl", { class: "record-summary" },
         element("dt", {}, "Permit"), element("dd", {}, chosen.name),
         element("dt", {}, "Applicant"), element("dd", {}, answers.name),
-        element("dt", {}, "Vehicle"), element("dd", {}, vehicle.plate + " · " + vehicle.state)),
+        element("dt", {}, "Vehicle"), element("dd", {}, vehicle.plate + " · " + vehicle.state + " · " + vehicle.vehicle_type)),
       element("p", { class: "status-note" }, "Submitting an application does not authorize parking."),
       field("I reviewed the permit and vehicle details", confirm),
-      element("div", { class: "actions" }, action("Edit about you", () => about()),
-        action("Edit permit", options), action("Edit vehicle", vehicleStep), submit));
+      element("div", { class: "actions" }, action("Edit about you", () => about(), true),
+        action("Edit permit", options, true), action("Edit vehicle", vehicleStep, true)),
+      element("div", { class: "actions submit-actions" }, submit));
     showStep("Step 4 of 5: Review", form, true);
   }
 
@@ -372,7 +406,7 @@ async function tickets() {
         search.removeAttribute("aria-invalid");
         document.getElementById("ticket-search-error").textContent = "";
         render();
-      })));
+      }, true)));
   searchForm.addEventListener("submit", event => {
     event.preventDefault();
     if (!validate(searchForm)) return;
@@ -384,9 +418,34 @@ async function tickets() {
   const amount = element("input", { id: "ticket-amount", type: "number", required: "", min: ".01", max: "9999.99", step: ".01" });
   const reason = element("textarea", { id: "ticket-reason", required: "", maxlength: "500", rows: "3" });
   const addButton = element("button", { type: "submit" }, "Save ticket");
+  function clearAddForm() {
+    addForm.reset();
+    for (const control of addForm.elements) {
+      if (!control.id) continue;
+      control.removeAttribute("aria-invalid");
+      control.setCustomValidity?.("");
+      const error = document.getElementById(control.id + "-error");
+      if (error) error.textContent = "";
+    }
+  }
+  function closeAdd() {
+    if (addButton.disabled) return;
+    clearAddForm();
+    addPanel.open = false;
+    addPanel.querySelector("summary").focus();
+  }
+  const cancelAdd = action("Cancel", closeAdd, true);
   const addForm = element("form", { novalidate: "" }, field("Ticket number", number),
-    field("Amount in dollars", amount, "For example, 35.00."), field("Reason shown on the ticket", reason), addButton);
+    field("Amount in dollars", amount, "For example, 35.00."), field("Reason shown on the ticket", reason),
+    element("div", { class: "actions" }, cancelAdd, addButton));
   const addPanel = element("details", {}, element("summary", {}, "Add a ticket"), addForm);
+  addPanel.addEventListener("toggle", () => { if (!addPanel.open) clearAddForm(); });
+  addPanel.addEventListener("keydown", event => {
+    if (event.key === "Escape") {
+      event.preventDefault();
+      closeAdd();
+    }
+  });
   const addRequest = requestIds();
   reason.addEventListener("input", () => reason.setCustomValidity(reason.value.trim() ? "" : "Enter the reason shown on the ticket."));
   submitForm(addForm, addButton, async () => {
@@ -394,12 +453,12 @@ async function tickets() {
     if (!validate(addForm)) return;
     const ticket = await api("/tickets", addRequest({ number: number.value, amount: amount.value, reason: reason.value.trim() }));
     records.push(ticket);
-    addForm.reset();
+    clearAddForm();
     addPanel.open = false;
-    addPanel.querySelector("summary").focus();
     filter = "";
     search.value = "";
     render();
+    document.getElementById("ticket-" + ticket.id)?.focus();
     status.textContent = "Ticket " + ticket.number + " saved.";
   });
 
@@ -409,7 +468,8 @@ async function tickets() {
     selected.clear();
     results.querySelectorAll('input[type="checkbox"]').forEach(box => { box.checked = false; });
     updateTotal();
-  });
+    clear.focus();
+  }, true);
   function chosen() {
     return records.filter(ticket => selected.has(ticket.id));
   }
@@ -419,7 +479,7 @@ async function tickets() {
     pay.disabled = appeal.disabled = count === 0;
   }
   function confirmation(record) {
-    return element("details", {},
+    const panel = element("details", {},
       element("summary", {}, "View confirmation " + record.id),
       paragraph(record.action === "pay" ? "Payment recorded" : "Appeal recorded"),
       paragraph("Total " + money(record.total_cents)),
@@ -434,15 +494,26 @@ async function tickets() {
         element("a", { href: url, download: record.id + ".txt" }).click();
         setTimeout(() => URL.revokeObjectURL(url), 1000);
       }));
+    panel.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        panel.open = false;
+        panel.querySelector("summary").focus();
+      }
+    });
+    return panel;
   }
   function render() {
+    const focusedId = results.contains(document.activeElement) ? document.activeElement.id : "";
     const visible = records.filter(ticket => !filter || ticket.number === filter.trim().toUpperCase());
     results.replaceChildren(...visible.map(ticket => {
-      const nodes = [heading("Ticket " + ticket.number),
+      const title = heading("Ticket " + ticket.number);
+      title.id = "ticket-" + ticket.id;
+      const nodes = [title,
         paragraph(money(ticket.amount_cents) + " · " + ({ unpaid: "Unpaid", paid: "Payment recorded", appeal_pending: "Appeal recorded" })[ticket.status]),
         paragraph(ticket.reason)];
       if (ticket.status === "unpaid") {
-        const box = element("input", { type: "checkbox" });
+        const box = element("input", { type: "checkbox", id: "ticket-box-" + ticket.id });
         box.checked = selected.has(ticket.id);
         box.addEventListener("change", () => {
           if (box.checked && selected.size >= 50) {
@@ -461,6 +532,7 @@ async function tickets() {
     }));
     if (!visible.length) results.append(paragraph(filter ? "No tickets match that number." : "No tickets saved. Add a ticket to get started."));
     updateTotal();
+    if (focusedId) document.getElementById(focusedId)?.focus();
   }
 
   function review(kind, opener) {
@@ -472,8 +544,9 @@ async function tickets() {
     const explanation = element("textarea", { id: "appeal-explanation", required: "", maxlength: "2000", rows: "4" });
     const reviewed = element("input", { id: "ticket-reviewed", type: "checkbox", required: "" });
     const submit = element("button", { type: "submit" }, kind === "pay" ? "Record payment" : "Record appeal");
-    const cancel = action("Cancel", () => dialog.close());
+    const cancel = action("Cancel", () => dialog.close(), true);
     const error = element("p", { class: "error", role: "alert" });
+    let updatedTicketId = "";
     const form = element("form", { novalidate: "" },
       element("ul", {}, ...items.map(ticket => element("li", {}, ticket.number + " · " + money(ticket.amount_cents)))),
       paragraph("Total " + money(cents)));
@@ -486,7 +559,14 @@ async function tickets() {
     dialog.append(title, form);
     dialog.addEventListener("close", () => {
       dialog.remove();
-      (opener.disabled ? searchButton : opener).focus();
+      const target = updatedTicketId ? document.getElementById("ticket-" + updatedTicketId) : null;
+      (target || (opener.disabled ? searchButton : opener)).focus();
+    });
+    dialog.addEventListener("keydown", event => {
+      if (event.key === "Escape" && !submit.disabled) {
+        event.preventDefault();
+        dialog.close();
+      }
     });
     const actionRequest = requestIds();
     form.addEventListener("submit", async event => {
@@ -505,6 +585,7 @@ async function tickets() {
           ticket.confirmation = result;
           selected.delete(ticket.id);
         }
+        updatedTicketId = items[0]?.id || "";
         render();
         dialog.close();
         status.textContent = "Confirmation " + result.id + " saved.";
