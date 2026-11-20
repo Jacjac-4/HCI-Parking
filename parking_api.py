@@ -2,7 +2,7 @@
 from datetime import datetime, timezone
 from threading import RLock
 from typing import Literal
-from uuid import UUID
+from uuid import UUID, uuid4
 
 from pathlib import Path
 
@@ -37,6 +37,40 @@ class Vehicle(BaseModel):
     plate: str = Field(min_length=1, max_length=10, pattern=r"^[A-Za-z0-9][A-Za-z0-9 -]*$")
     state: str = Field(pattern=r"^[A-Za-z]{2}$")
     vehicle_type: Literal["car", "motorcycle", "moped"]
+
+
+SAVED_VEHICLES = {}
+
+@app.get("/vehicles")
+def list_vehicles():
+    with application_lock:
+        return list(SAVED_VEHICLES.values())
+
+@app.post("/vehicles")
+def save_vehicle(vehicle: Vehicle):
+    with application_lock:
+        data = vehicle.model_dump()
+        for item in SAVED_VEHICLES.values():
+            if all(item[key] == value for key, value in data.items()):
+                return item
+        item = {"id": str(uuid4()), **data}
+        SAVED_VEHICLES[item["id"]] = item
+        return item
+
+@app.put("/vehicles/{vehicle_id}")
+def edit_vehicle(vehicle_id: str, vehicle: Vehicle):
+    with application_lock:
+        if vehicle_id not in SAVED_VEHICLES:
+            raise HTTPException(status_code=404, detail="Saved vehicle not found")
+        SAVED_VEHICLES[vehicle_id] = {"id": vehicle_id, **vehicle.model_dump()}
+        return SAVED_VEHICLES[vehicle_id]
+
+@app.delete("/vehicles/{vehicle_id}")
+def remove_vehicle(vehicle_id: str):
+    with application_lock:
+        if SAVED_VEHICLES.pop(vehicle_id, None) is None:
+            raise HTTPException(status_code=404, detail="Saved vehicle not found")
+        return {"removed": True}
 
 
 class ApplicationRequest(BaseModel):
@@ -118,7 +152,7 @@ def submit_application(req: ApplicationRequest):
             "status": "under_review",
             "authorization": "not_valid",
             "status_explanation": "Application received; not yet approved. This application does not authorize parking.",
-            "next_action": "Review your application details in My Parking. You can withdraw an incorrect application and submit a corrected one.",
+            "next_action": "Review your application details in My Applications. You can withdraw an incorrect application and submit a corrected one.",
             "permit_id": None,
         }
         APPLICATIONS.append(application)

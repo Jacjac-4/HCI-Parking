@@ -7,6 +7,7 @@
   <link rel="stylesheet" href="/ds3/styles.css">
   <script type="module" src="/ds3/portal.js"></script>
 </head>
+<body data-page="{page}">
 <!-- Popup shared by every page using this template -->
 <dialog id="parking-help-dialog" aria-labelledby="parking-help-title">
   <h2 id="parking-help-title">Parking Help</h2>
@@ -19,10 +20,9 @@
     <button type="submit" autofocus>Close</button>
   </form>
 </dialog>
-<body data-page="{page}">
   <a class="skip" href="#main">Skip to main content</a>
   <header class="masthead"><div class="wrap brand">
-    <span class="university">University of New Hampshire</span>
+    <img class="unh-logo" src="/ds3-assets/branding/unh-logo.svg" alt="University of New Hampshire" width="400" height="95">
     {brand}
   </div></header>
   <div class="nav-bar"><nav class="wrap" aria-label="Main navigation">{navigation}
