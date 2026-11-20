@@ -936,7 +936,7 @@ async function vehicleRequest(path, options) {
   if (!response.ok) throw new Error("Unable to update the saved vehicle. Check the details and try again.");
   return response.json();
 }
-async function savedVehicles() {
+async function savedVehicles(moveFocus = false) {
   content.replaceChildren(paragraph("Save a vehicle to reuse its details in future permit applications. Changes here do not change submitted applications."));
   const items = await api("/vehicles");
   const list = card(heading("Your saved vehicles"));
@@ -951,7 +951,7 @@ async function savedVehicles() {
     try {
       await vehicleRequest(editing ? "/vehicles/" + editing : "/vehicles", {method: editing ? "PUT" : "POST", body: JSON.stringify({plate: plate.value, state: state.value, vehicle_type: type.value})});
       status.textContent = editing ? "Vehicle updated." : "Vehicle saved.";
-      await savedVehicles();
+      await savedVehicles(true);
     } catch (error) { status.textContent = error.message; submit.disabled = false; }
   });
   submit.textContent = "Save vehicle";
@@ -963,13 +963,14 @@ async function savedVehicles() {
       action("Remove " + item.plate, async () => {
         const dialog = element("dialog", {"aria-label": "Remove saved vehicle"}, heading("Remove " + item.plate + "?"), paragraph("Submitted applications will keep their original vehicle information."));
         dialog.append(action("Keep vehicle", () => { dialog.close(); dialog.remove(); }), action("Remove vehicle", async () => {
-          try { await vehicleRequest("/vehicles/" + item.id, {method:"DELETE"}); dialog.close(); dialog.remove(); status.textContent = "Vehicle removed."; await savedVehicles(); }
+          try { await vehicleRequest("/vehicles/" + item.id, {method:"DELETE"}); dialog.close(); dialog.remove(); status.textContent = "Vehicle removed."; await savedVehicles(true); }
           catch(error) { status.textContent = error.message; }
         }, true));
         dialog.addEventListener("close", () => dialog.remove(), {once: true});
         document.body.append(dialog); dialog.showModal();
       }, true))));
   }
+  if (moveFocus) list.querySelector("h2").focus();
   content.append(card(title, form), paragraph("Saved vehicles are shared in this running application and reset when the server restarts."), buttonLink("Apply for a permit", "/ds3/permits"));
 }
 
