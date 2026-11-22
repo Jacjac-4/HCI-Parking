@@ -29,6 +29,11 @@ def script():
     return Response((directory / "portal.js").read_text(encoding="utf-8"), media_type="text/javascript")
 
 
+@router.get("/draft.mjs", include_in_schema=False)
+def draft_script():
+    return Response((directory / "draft.mjs").read_text(encoding="utf-8"), media_type="text/javascript")
+
+
 @router.get("/permit-form-options")
 def permit_form_options():
     return {"residences": RESIDENCES, "commuter_rule": COMMUTER_RULE}

@@ -1,3 +1,5 @@
+import { createDraftStorage, readPermitDraft } from "./draft.mjs";
+
 const content = document.querySelector("#content");
 const status = document.querySelector("#status");
 const query = new URLSearchParams(location.search);
@@ -148,6 +150,7 @@ function showStep(title, body, moveFocus, onNavigate, furthest) {
 
 async function permits() {
   const { residences, commuter_rule: commuterRule } = await api("/ds3/permit-form-options");
+  const draftStorage = createDraftStorage(() => sessionStorage);
   const draftKey = "ds3-permit-application-draft";
   const answers = { name: "", residence: "", year: "", commuter_eligible: false };
   const vehicle = { plate: "", state: "" };
@@ -170,14 +173,11 @@ async function permits() {
   let savedDraft;
   let reviewedKey = "";
 
-  const storedDraft = sessionStorage.getItem(draftKey);
-  if (storedDraft) {
-    try {
-      savedDraft = JSON.parse(storedDraft);
-    } catch {
-      sessionStorage.removeItem(draftKey);
-      status.textContent = "Saved permit progress could not be restored. Please start again.";
-    }
+  const storedDraft = draftStorage.getItem(draftKey);
+  savedDraft = readPermitDraft(storedDraft);
+  if (storedDraft && !savedDraft) {
+    draftStorage.removeItem(draftKey);
+    status.textContent = "Saved permit progress could not be restored. Please start again.";
   }
   if (savedDraft?.version === 1) {
     if (typeof savedDraft.answers?.name === "string") answers.name = savedDraft.answers.name;
@@ -204,12 +204,12 @@ async function permits() {
       review: 4,
     }[currentStep]);
     if (savedDraft.request && typeof savedDraft.request.key === "string" &&
-        typeof savedDraft.request.id === "string") request = savedDraft.request;
+        typeof savedDraft.request.id === "string" && /^[0-9a-f]{8}(-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(savedDraft.request.id)) request = savedDraft.request;
   }
 
   function persistDraft(step = currentStep) {
     currentStep = step;
-    sessionStorage.setItem(draftKey, JSON.stringify({
+    draftStorage.setItem(draftKey, JSON.stringify({
       version: 1,
       step: currentStep,
       furthestStep,
@@ -224,6 +224,12 @@ async function permits() {
 
 
   function navigatePermitStep(stepNumber) {
+    const currentNumber = {about: 1, options: 2, vehicle: 3, review: 4}[currentStep];
+    if (stepNumber > currentNumber) {
+      // Forward progress must run the current form's validation and matching.
+      content.querySelector("form")?.requestSubmit();
+      return;
+    }
     returnToReview = false;
     if (stepNumber === 1) about(true);
     else if (stepNumber === 2) options();
@@ -318,10 +324,12 @@ async function permits() {
     showStep("Step 1 of 5: About you", form, moveFocus, navigatePermitStep, furthestStep);
   }
 
-  function options(returnToReview = false) {
-    returnToReview &&= furthestStep >= 4;
+  function options(resumeReview = false) {
+    returnToReview = resumeReview && furthestStep >= 4;
     persistDraft("options");
     if (!matches.length) {
+      furthestStep = 2;
+      persistDraft("options");
       const explanation = answers.year === "freshman" && answers.residence !== "off_campus"
         ? "The academic-year student permits have no match for freshmen who live on campus. Off-campus freshmen may qualify for other options."
         : "No academic-year student permits match these answers.";
@@ -330,6 +338,7 @@ async function permits() {
           link("Parking Help for permits", "/ds3/help#permits"))), true, navigatePermitStep, furthestStep);
       return;
     }
+    const previousVehicleType = chosen?.vehicle_requirement;
     const picker = radioGroup("permit", "Choose your permit type",
       matches.map(permit => [permit.id, permit.name + " - $" + permit.price + (permit.lottery_required ? " (lottery)" : "")]), chosen?.id,
       "Select a permit to continue.", "choice-cards");
@@ -345,8 +354,11 @@ async function permits() {
       chosen = matches.find(permit => permit.id === Number(picker.querySelector("input:checked")?.value));
       furthestStep = Math.max(furthestStep, 3);
       persistDraft();
-      if (returnToReview) review();
-      else vehicleStep();
+      if (returnToReview && previousVehicleType === chosen.vehicle_requirement) review();
+      else {
+        if (previousVehicleType && previousVehicleType !== chosen.vehicle_requirement) Object.assign(vehicle, {plate: "", state: ""});
+        vehicleStep(returnToReview);
+      }
     });
     form.append(picker, allocation,
       element("div", { class: "actions" }, action("Back", () => about(true, returnToReview)), submit));
@@ -356,6 +368,7 @@ async function permits() {
   async function vehicleStep(fromReview = false) {
     returnToReview = fromReview;
     persistDraft("vehicle");
+    const originalVehicle = {...vehicle};
     const plate = element("input", { id: "plate", required: "", maxlength: "10", pattern: "[A-Za-z0-9][A-Za-z0-9 \\-]*" });
     const state = element("input", { id: "state", required: "", maxlength: "2", pattern: "[A-Za-z]{2}" });
     plate.value = vehicle.plate;
@@ -383,8 +396,13 @@ async function permits() {
       field("License plate", plate, "Enter the license plate as shown on the vehicle registration, for example: ABC-1234."),
       field("State", state, "Enter the two-letter state code shown on the vehicle registration, for example: NH."),
       element("div", { class: "actions" },
-        action("Back", () => fromReview ? review() : options()), submit));
-    const saved = (await api("/vehicles").catch(() => { status.textContent = "Saved vehicles could not be loaded. You can still enter vehicle details manually."; return []; })).filter(item => item.vehicle_type === chosen.vehicle_requirement);
+        action("Back", () => {
+          if (fromReview && originalVehicle.plate && originalVehicle.state) { Object.assign(vehicle, originalVehicle); review(); }
+          else options();
+        }), submit));
+    const requiredType = chosen.vehicle_requirement;
+    showStep("Step 3 of 5: Vehicle", form, true, navigatePermitStep, furthestStep);
+    const saved = (await api("/vehicles").catch(() => { status.textContent = "Saved vehicles could not be loaded. You can still enter vehicle details manually."; return []; })).filter(item => item.vehicle_type === requiredType);
     const picker = select("saved-vehicle", saved.map(item => [item.id, item.plate + " / " + item.state]), "", "Enter manually or choose a saved vehicle");
     picker.required = false;
     picker.addEventListener("change", () => {
@@ -392,10 +410,13 @@ async function permits() {
       if (selected) { plate.value = selected.plate; state.value = selected.state; saveVehicleDraft(); }
     });
     form.prepend(field("Saved vehicle (optional)", picker, "Only vehicles matching this permit's required type are shown."), link("Manage saved vehicles", "/ds3/vehicles"));
-    showStep("Step 3 of 5: Vehicle", form, true, navigatePermitStep, furthestStep);
   }
 
   function review() {
+    if (!/^[A-Za-z0-9][A-Za-z0-9 -]{0,9}$/.test(vehicle.plate.trim()) || !/^[A-Za-z]{2}$/.test(vehicle.state.trim())) {
+      vehicleStep(true);
+      return;
+    }
     returnToReview = false;
     persistDraft("review");
     const currentReviewKey = JSON.stringify({ answers, vehicle, permit: chosen.id });
@@ -436,7 +457,7 @@ async function permits() {
         submitArea.querySelector("h3").focus();
         return;
       }
-      sessionStorage.removeItem(draftKey);
+      draftStorage.removeItem(draftKey);
       const applicationStatus = ({ under_review: "Pending Review", withdrawn: "Withdrawn" })[record.status] || record.status;
       const applicationResidence = record.applicant.residence === "off_campus"
         ? "Off campus"
@@ -505,6 +526,15 @@ async function permits() {
   }
 
   content.before(contextHelp("permit", "Your residence and student year determine which permits appear. You can edit your answers before submitting."));
+  if (!answers.name.trim() || !answers.residence || !answers.year ||
+      (answers.residence !== "off_campus" && !selectedCampusResidence)) {
+    currentStep = "about";
+    furthestStep = 1;
+  }
+  if (["vehicle", "review"].includes(currentStep) &&
+      (!/^[A-Za-z0-9][A-Za-z0-9 -]{0,9}$/.test(vehicle.plate.trim()) || !/^[A-Za-z]{2}$/.test(vehicle.state.trim()))) {
+    currentStep = "vehicle";
+  }
   if (!savedDraft || currentStep === "about") {
     about(false);
     return;
@@ -761,12 +791,13 @@ async function tickets() {
       closeAdd();
     }
   });
-  const addRequest = requestIds();
+  let addRequest = requestIds();
   reason.addEventListener("input", () => reason.setCustomValidity(reason.value.trim() ? "" : "Enter the reason shown on the ticket."));
   submitForm(addForm, addButton, async () => {
     reason.setCustomValidity(reason.value.trim() ? "" : "Enter the reason shown on the ticket.");
     if (!validate(addForm)) return;
     const ticket = await api("/tickets", addRequest({ number: number.value, amount: amount.value, reason: reason.value.trim() }));
+    addRequest = requestIds();
     records.push(ticket);
     clearAddForm();
     addPanel.open = false;
@@ -951,7 +982,10 @@ async function help() {
 
 async function vehicleRequest(path, options) {
   const response = await fetch(path, {headers: {"Content-Type":"application/json"}, ...options});
-  if (!response.ok) throw new Error("Unable to update the saved vehicle. Check the details and try again.");
+  if (!response.ok) {
+    const error = await response.json().catch(() => ({}));
+    throw new Error(typeof error.detail === "string" ? error.detail : "Unable to update the saved vehicle. Check the details and try again.");
+  }
   return response.json();
 }
 async function savedVehicles(moveFocus = false) {
@@ -959,31 +993,43 @@ async function savedVehicles(moveFocus = false) {
   const items = await api("/vehicles");
   const list = card(heading("Your saved vehicles"));
   content.append(list);
-  const plate = element("input", { id: "saved-plate", required: "", maxlength: "10", pattern: "[A-Za-z0-9][A-Za-z0-9 -]*" });
+  const plate = element("input", { id: "saved-plate", required: "", maxlength: "10", pattern: "[A-Za-z0-9][A-Za-z0-9 \\-]*" });
   const state = element("input", { id: "saved-state", required: "", maxlength: "2", pattern: "[A-Za-z]{2}" });
   const type = select("saved-type", [["car", "Car"], ["motorcycle", "Motorcycle"], ["moped", "Moped"]]);
   let editing = null;
   const title = heading("Add a vehicle");
   const {form, submit} = formFor(async () => {
-    submit.disabled = true;
-    try {
-      await vehicleRequest(editing ? "/vehicles/" + editing : "/vehicles", {method: editing ? "PUT" : "POST", body: JSON.stringify({plate: plate.value, state: state.value, vehicle_type: type.value})});
-      status.textContent = editing ? "Vehicle updated." : "Vehicle saved.";
-      await savedVehicles(true);
-    } catch (error) { status.textContent = error.message; submit.disabled = false; }
+    await vehicleRequest(editing ? "/vehicles/" + editing : "/vehicles", {method: editing ? "PUT" : "POST", body: JSON.stringify({plate: plate.value, state: state.value, vehicle_type: type.value})});
+    status.textContent = editing ? "Vehicle updated." : "Vehicle saved.";
+    await savedVehicles(true);
   });
   submit.textContent = "Save vehicle";
-  form.append(field("License plate", plate), field("State", state, "Two-letter state code, for example NH."), field("Vehicle type", type), element("div", {class: "actions"}, submit, action("Cancel edit", () => savedVehicles(), true)));
+  form.append(field("License plate", plate), field("State", state, "Two-letter state code, for example NH."), field("Vehicle type", type), element("div", {class: "actions"}, submit, action("Cancel edit", () => { status.textContent = ""; return savedVehicles(true); }, true)));
   if (!items.length) list.append(paragraph("No vehicles saved yet. You can always enter a vehicle manually when applying."));
   for (const item of items) {
     list.append(card(heading(item.plate + " / " + item.state), paragraph(item.vehicle_type), element("div", {class: "actions"},
       action("Edit " + item.plate, () => { editing = item.id; plate.value = item.plate; state.value = item.state; type.value = item.vehicle_type; title.textContent = "Edit vehicle"; plate.focus(); }, true),
       action("Remove " + item.plate, async () => {
         const dialog = element("dialog", {"aria-label": "Remove saved vehicle"}, heading("Remove " + item.plate + "?"), paragraph("Submitted applications will keep their original vehicle information."));
-        dialog.append(action("Keep vehicle", () => { dialog.close(); dialog.remove(); }), action("Remove vehicle", async () => {
-          try { await vehicleRequest("/vehicles/" + item.id, {method:"DELETE"}); dialog.close(); dialog.remove(); status.textContent = "Vehicle removed."; await savedVehicles(true); }
-          catch(error) { status.textContent = error.message; }
-        }, true));
+        const message = element("p", {class: "error", role: "alert"});
+        const keep = action("Keep vehicle", () => dialog.close());
+        const remove = action("Remove vehicle", async () => {
+          if (remove.disabled) return;
+          remove.disabled = keep.disabled = true;
+          message.textContent = "";
+          try {
+            await vehicleRequest("/vehicles/" + item.id, {method:"DELETE"});
+            dialog.close();
+            status.textContent = "Vehicle removed.";
+            await savedVehicles(true);
+          } catch(error) {
+            message.textContent = error.message;
+            remove.disabled = keep.disabled = false;
+            remove.focus();
+          }
+        }, true);
+        dialog.append(message, element("div", {class: "actions"}, keep, remove));
+        dialog.addEventListener("cancel", event => { if (remove.disabled) event.preventDefault(); });
         dialog.addEventListener("close", () => dialog.remove(), {once: true});
         document.body.append(dialog); dialog.showModal();
       }, true))));
@@ -1033,6 +1079,9 @@ if (footerHelpButton && helpDialog) {
   
     if (!helpDocument) return;
   
+    const navigation = helpDocument.createElement("base");
+    navigation.target = "_top";
+    helpDocument.head.appendChild(navigation);
     const popupStyles = helpDocument.createElement("style");
     popupStyles.textContent = `
       .masthead,

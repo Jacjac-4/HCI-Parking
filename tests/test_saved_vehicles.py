@@ -36,6 +36,13 @@ class SavedVehicleTests(unittest.TestCase):
         self.assertEqual(self.client.get('/applications/' + application['id']).json()['vehicle']['plate'], 'SAVE123')
         self.assertEqual(self.client.delete('/vehicles/' + saved['id']).status_code, 404)
 
+    def test_edit_cannot_duplicate_another_saved_vehicle(self):
+        first = self.client.post('/vehicles', json=self.vehicle).json()
+        second = self.client.post('/vehicles', json={**self.vehicle, 'plate': 'SECOND'}).json()
+        self.assertEqual(self.client.put('/vehicles/' + second['id'], json=self.vehicle).status_code, 409)
+        self.assertEqual(self.client.put('/vehicles/' + first['id'], json=self.vehicle).status_code, 200)
+        self.assertEqual([item['plate'] for item in self.client.get('/vehicles').json()], ['SAVE123', 'SECOND'])
+
     def test_validation_and_vehicle_compatibility(self):
         for change in ({'plate': '<script>'}, {'state': 'New Hampshire'}, {'vehicle_type': 'truck'}):
             self.assertEqual(self.client.post('/vehicles', json={**self.vehicle, **change}).status_code, 422)
@@ -49,7 +56,7 @@ class SavedVehicleTests(unittest.TestCase):
         self.assertEqual(response.status_code, 422)
 
     def test_unicode_headers_logo_and_vehicle_page(self):
-        for path in ('/ds3/vehicles', '/ds3/portal.js', '/ds3/styles.css'):
+        for path in ('/ds3/vehicles', '/ds3/portal.js', '/ds3/draft.mjs', '/ds3/styles.css'):
             response = self.client.get(path)
             self.assertEqual(response.status_code, 200)
             self.assertIn('charset=utf-8', response.headers['content-type'])

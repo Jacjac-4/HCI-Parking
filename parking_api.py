@@ -62,7 +62,11 @@ def edit_vehicle(vehicle_id: str, vehicle: Vehicle):
     with application_lock:
         if vehicle_id not in SAVED_VEHICLES:
             raise HTTPException(status_code=404, detail="Saved vehicle not found")
-        SAVED_VEHICLES[vehicle_id] = {"id": vehicle_id, **vehicle.model_dump()}
+        data = vehicle.model_dump()
+        if any(key != vehicle_id and all(item[field] == value for field, value in data.items())
+               for key, item in SAVED_VEHICLES.items()):
+            raise HTTPException(status_code=409, detail="This vehicle is already saved. Choose a different plate, state or type.")
+        SAVED_VEHICLES[vehicle_id] = {"id": vehicle_id, **data}
         return SAVED_VEHICLES[vehicle_id]
 
 @app.delete("/vehicles/{vehicle_id}")
