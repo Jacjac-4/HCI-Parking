@@ -10,6 +10,17 @@ class SprintThreeTests(unittest.TestCase):
     def setUp(self):
         self.client = TestClient(app)
 
+    def test_lottery_guidance_is_scoped_to_lottery_permits(self):
+        permits = self.client.get("/permit-types").json()
+        self.assertEqual({p["name"] for p in permits if p["lottery_required"]}, {
+            "Gables", "Woodside", "Strafford", "Resident East", "Resident West", "Non-Resident (storage)"
+        })
+        for permit in permits:
+            if permit["lottery_required"]:
+                self.assertEqual(permit["lottery_url"], "https://www.unh.edu/transportation/parking/parking-policies/parking-faq")
+        matches = self.client.post("/permit-matches", json={"name": "Test", "year": "continuing", "residence": "gables", "commuter_eligible": False}).json()
+        self.assertTrue(next(p for p in matches if p["name"] == "Gables")["lottery_required"])
+
     def test_navigation_matches_each_page_and_keeps_every_task_on_one_server(self):
         titles = set()
         for route in ("/", "/permits", "/my-parking", "/lots", "/tickets", "/help"):

@@ -255,7 +255,7 @@ async function permits() {
     const campusResidenceField = field("Residence hall", campusResidence, "Start typing or select from the list.");
     const year = radioGroup("year", "Student year",
       [["freshman", "Freshman"], ["continuing", "Sophomore, junior, senior, or graduate student"]], answers.year,
-      "Choose your current academic year.");
+      "Choose the group that includes your current year. Sophomore, junior, senior, and graduate students share the same permit eligibility rules in this application.");
     const commuter = element("input", { type: "checkbox", id: "commuter" });
     commuter.checked = answers.commuter_eligible;
     const commuterField = element("div", { class: "field" },
@@ -331,10 +331,14 @@ async function permits() {
       return;
     }
     const picker = radioGroup("permit", "Choose your permit type",
-      matches.map(permit => [permit.id, permit.name + " - $" + permit.price]), chosen?.id,
+      matches.map(permit => [permit.id, permit.name + " - $" + permit.price + (permit.lottery_required ? " (lottery)" : "")]), chosen?.id,
       "Select a permit to continue.", "choice-cards");
+    const allocation = element("div", {"aria-live": "polite"});
+    const updateAllocation = () => allocation.replaceChildren(...(chosen?.lottery_required ? [lotteryNotice(chosen)] : []));
+    updateAllocation();
     picker.addEventListener("change", () => {
       chosen = matches.find(permit => permit.id === Number(picker.querySelector("input:checked")?.value));
+      updateAllocation();
       persistDraft();
     });
     const { form, submit } = formFor(() => {
@@ -344,7 +348,7 @@ async function permits() {
       if (returnToReview) review();
       else vehicleStep();
     });
-    form.append(picker,
+    form.append(picker, allocation,
       element("div", { class: "actions" }, action("Back", () => about(true, returnToReview)), submit));
     showStep("Step 2 of 5: Permit", form, true, navigatePermitStep, furthestStep);
   }
@@ -458,6 +462,7 @@ async function permits() {
         element("aside", { class: "parking-warning", "aria-label": "Important parking restriction" },
           element("h3", {}, "Important"),
           element("strong", {}, "Do not park on campus until your permit has been approved.")),
+        ...(chosen.lottery_required ? [lotteryNotice(chosen)] : []),
         element("section", { class: "next-steps", "aria-labelledby": "confirmation-next-steps-title" },
           element("h3", { id: "confirmation-next-steps-title" }, "Next Steps"),
           element("ul", {},
@@ -494,6 +499,7 @@ async function permits() {
       element("aside", { class: "parking-warning", "aria-label": "Important parking restriction" },
         element("h3", {}, "Important"),
         element("strong", {}, "Do not park on campus until your permit has been approved.")),
+      ...(chosen.lottery_required ? [lotteryNotice(chosen)] : []),
       field("I reviewed the permit and vehicle details", confirm), submitArea);
     showStep("Step 4 of 5: Review", form, true, navigatePermitStep, furthestStep);
   }
@@ -508,6 +514,14 @@ async function permits() {
   if (currentStep === "options" || !chosen) options(returnToReview);
   else if (currentStep === "vehicle") await vehicleStep(returnToReview);
   else review();
+}
+
+function lotteryNotice(permit) {
+  return element("aside", {class: "lottery-notice", "aria-label": "Lottery allocation"},
+    element("h3", {}, "Lottery allocation"),
+    paragraph("UNH allocates " + permit.name + " permits through a lottery. Spaces are limited and a waitlist may apply; selection is not guaranteed."),
+    paragraph("Follow UNH's enrollment instructions to enter the lottery. Submitting an application here does not enroll you in the UNH lottery."),
+    link("Check UNH lottery instructions and enrollment dates", permit.lottery_url));
 }
 
 const mapFiles = [
@@ -533,14 +547,18 @@ async function coverage(preview, container = content) {
       parts.push(link("View " + permit.name + " lot details and map", "/ds3/lots?permit_id=" + permit.id));
     } else {
       parts.push(paragraph(permit.eligibility_reason));
+      if (permit.lottery_required) parts.push(lotteryNotice(permit));
       if (map) {
-        if (map === "resident-core.jpg") parts.push(paragraph("This map shows several permit categories. Use the covered-lot list above for the selected permit."));
-        parts.push(element("img", { src, alt: "UNH campus map for " + permit.name + ". Covered lots are listed above." }),
+        const detailedMap = element("details", { class: "campus-map" },
+          element("summary", {}, "View detailed UNH campus map for " + permit.name),
+          paragraph("The official UNH map includes other parking areas and campus details. Use the covered-lot list above for your selected permit."),
+          element("img", { src, loading: "lazy", alt: "Official UNH campus map for " + permit.name + ". Covered lots for this permit are listed above." }),
           link("Open the full-size " + permit.name + " map", src));
+        parts.push(detailedMap);
       }
     }
     results.replaceChildren(...parts);
-    if (announce) status.textContent = permit.name + " coverage updated. " + permit.lots.length + " lots or parking areas listed.";
+    if (announce) status.textContent = permit.name + " coverage updated. " + permit.lots.length + (permit.lots.length === 1 ? " lot or parking area listed." : " lots or parking areas listed.");
   }
 
   form.addEventListener("submit", event => {
@@ -554,7 +572,7 @@ async function coverage(preview, container = content) {
     const target = /^APP-\d+$/.test(application || "") ? "#" + application : "";
     container.append(buttonLink("Back to My Applications", "/ds3/my-parking" + target));
   }
-  container.append(card(...(title ? [title] : []), paragraph("Choose a permit to see its covered lots and campus map."), form, results,
+  container.append(card(...(title ? [title] : []), paragraph("Choose a permit to see its covered lots. Expand the detailed campus map if you need more context."), form, results,
     ...(preview ? [buttonLink("View covered lots and maps", "/ds3/lots")] : [paragraph("Coverage is based on published permit information. Follow posted signs.")] )));
 }
 

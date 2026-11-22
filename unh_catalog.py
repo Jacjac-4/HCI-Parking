@@ -18,6 +18,8 @@ WEST = ['West Edge Lot', 'Mast Road Lot', 'Mathes Lot']
 
 def permit(id, name, price, lots, rule, vehicle='car'):
     return dict(id=id, name=name, price=price, lots=lots, eligibility_reason=rule,
+                lottery_required=id in (2, 3, 4, 5, 6, 7),
+                lottery_url='https://www.unh.edu/transportation/parking/parking-policies/parking-faq',
                 vehicle_requirement=vehicle, term='Academic year (fall and spring)',
                 source_url=SOURCE, checked_on='2026-10-14')
 

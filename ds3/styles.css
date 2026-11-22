@@ -136,3 +136,9 @@ dialog { width: min(48rem, calc(100% - 2rem)); max-height: 90vh; overflow: auto;
 dialog::backdrop { background: #041e4280; }
 nav a { font-size: .94rem; }
 @media(max-width: 40rem) { .unh-logo { width: 16rem; } nav a { padding: .6rem; } .masthead { padding-block: 1.2rem; } }
+
+.campus-map { margin-top: 1rem; border: 1px solid var(--line); border-radius: .25rem; padding: 0 1rem 1rem; background: #f5f6f8; }
+.campus-map:not([open]) { padding-bottom: 0; }
+.campus-map summary { color: var(--navy); }
+.lottery-notice { margin-block: 1rem; padding: 1rem; border-left: 4px solid #0075be; background: #edf3fa; }
+.lottery-notice h3 { margin-top: 0; }
