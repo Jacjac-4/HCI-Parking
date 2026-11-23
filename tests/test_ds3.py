@@ -146,7 +146,7 @@ class SprintThreeTests(unittest.TestCase):
         self.assertIn("Review your application below. You can still make changes before submitting.", script)
         self.assertNotIn("You can still return and make changes before submitting.", script)
         self.assertIn('element("aside", { class: "parking-warning", "aria-label": "Important parking restriction" }', script)
-        self.assertIn('element("h3", {}, "Important")', script)
+        self.assertIn('element("h3", {}, "Parking approval required")', script)
         self.assertIn('const applicationStatus = ({ under_review: "Pending Review", withdrawn: "Withdrawn" })[record.status] || record.status;', script)
         self.assertIn('class: "review-summary confirmation-summary"', script)
         self.assertIn('class: "review-card confirmation-number-card", "aria-labelledby": "confirmation-number-title"', script)
@@ -173,7 +173,7 @@ class SprintThreeTests(unittest.TestCase):
         self.assertIn('"Check your application status."', script)
         self.assertIn('"Withdraw an incorrect application if necessary."', script)
         self.assertIn('link("View your application in My Applications",', script)
-        self.assertIn('id: "reviewed"', script)
+        self.assertNotIn('id: "reviewed"', script)
 
         styles = self.client.get("/ds3/styles.css").text
         self.assertIn(".radio-group > label { display: flex; min-height: 44px;", styles)

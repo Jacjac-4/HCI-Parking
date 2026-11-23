@@ -171,7 +171,6 @@ async function permits() {
   let returnToReview = false;
   let furthestStep = 1;
   let savedDraft;
-  let reviewedKey = "";
 
   const storedDraft = draftStorage.getItem(draftKey);
   savedDraft = readPermitDraft(storedDraft);
@@ -266,6 +265,7 @@ async function permits() {
     commuter.checked = answers.commuter_eligible;
     const commuterField = element("div", { class: "field" },
       element("label", {}, commuter, " I live off campus and meet the commuter requirements"),
+      paragraph("Optional: check this only if you meet the commuter requirements below. Leave it unchecked to see other eligible options, such as storage or motorcycle permits."),
       paragraph(commuterRule));
     function updateResidenceFields() {
       const location = residence.querySelector("input:checked")?.value;
@@ -419,10 +419,6 @@ async function permits() {
     }
     returnToReview = false;
     persistDraft("review");
-    const currentReviewKey = JSON.stringify({ answers, vehicle, permit: chosen.id });
-    const confirm = element("input", { id: "reviewed", type: "checkbox", required: "" });
-    confirm.checked = reviewedKey === currentReviewKey;
-    confirm.addEventListener("change", () => { reviewedKey = confirm.checked ? currentReviewKey : ""; });
     const residenceSummary = answers.residence === "off_campus"
       ? "Off campus"
       : selectedCampusResidence.split("|").slice(1).join("|");
@@ -469,7 +465,8 @@ async function permits() {
             element("p", { class: "confirmation-number" }, record.id)),
           element("section", { class: "review-card", "aria-labelledby": "confirmation-permit-title" },
             element("h3", { id: "confirmation-permit-title" }, "Permit"),
-            paragraph(record.permit_type_name)),
+            paragraph(record.permit_type_name),
+            element("p", {class: "permit-price"}, "Permit cost: $" + record.price)),
           element("section", { class: "review-card", "aria-labelledby": "confirmation-applicant-title" },
             element("h3", { id: "confirmation-applicant-title" }, "Applicant"),
             paragraph("Name: " + record.applicant.name),
@@ -481,7 +478,7 @@ async function permits() {
             element("h3", { id: "confirmation-status-title" }, "Status"),
             element("p", { class: "confirmation-status" }, applicationStatus))),
         element("aside", { class: "parking-warning", "aria-label": "Important parking restriction" },
-          element("h3", {}, "Important"),
+          element("h3", {}, "Parking approval required"),
           element("strong", {}, "Do not park on campus until your permit has been approved.")),
         ...(chosen.lottery_required ? [lotteryNotice(chosen)] : []),
         element("section", { class: "next-steps", "aria-labelledby": "confirmation-next-steps-title" },
@@ -498,8 +495,8 @@ async function permits() {
         element("section", { class: "review-card", "aria-labelledby": "review-permit-title" },
           element("h3", { id: "review-permit-title" }, "Permit"),
           paragraph(chosen.name),
-          paragraph("Permit cost: $" + chosen.price),
-          paragraph(chosen.eligibility_reason),
+          element("p", {class: "permit-price"}, "Permit cost: $" + chosen.price),
+          paragraph(chosen.term),
           element("div", { class: "review-card-actions" }, action("Edit Permit", () => options(true)))),
         element("section", { class: "review-card", "aria-labelledby": "review-applicant-title" },
           element("h3", { id: "review-applicant-title" }, "Applicant"),
@@ -518,10 +515,10 @@ async function permits() {
           element("li", {}, "Check your application status for the review outcome."),
           element("li", {}, "You can view your application status in My Applications."))),
       element("aside", { class: "parking-warning", "aria-label": "Important parking restriction" },
-        element("h3", {}, "Important"),
+        element("h3", {}, "Parking approval required"),
         element("strong", {}, "Do not park on campus until your permit has been approved.")),
       ...(chosen.lottery_required ? [lotteryNotice(chosen)] : []),
-      field("I reviewed the permit and vehicle details", confirm), submitArea);
+      paragraph("Select Submit application to send these details for review."), submitArea);
     showStep("Step 4 of 5: Review", form, true, navigatePermitStep, furthestStep);
   }
 
@@ -632,7 +629,7 @@ async function myParking(focusId) {
       confirm.append(button);
       links.append(confirm);
     }
-    const applicationCard = card(title, element("p", { class: "status-note" }, record.status_explanation), paragraph(record.next_action),
+    const applicationCard = card(title, element("p", { class: record.authorization === "valid" ? "status-note" : "parking-warning" }, record.status_explanation), paragraph(record.next_action),
       paragraph("License plate: " + record.vehicle.plate),
       paragraph("State: " + record.vehicle.state), links);
     if (record.id === target) {
@@ -668,10 +665,10 @@ async function dashboard() {
       element("p", { class: "status-note" }, element("strong", {}, "Status: "), applicationStatus));
     if (latest.status === "withdrawn") {
       applicationsCard.append(
-        paragraph("This application does not authorize parking."),
+        element("p", {class: "parking-warning"}, "This application does not authorize parking."),
         paragraph("You may submit a new permit application if needed."));
     } else {
-      applicationsCard.append(paragraph(latest.authorization === "valid"
+      applicationsCard.append(element("p", {class: latest.authorization === "valid" ? "status-note" : "parking-warning"}, latest.authorization === "valid"
         ? "This application authorizes parking."
         : "This application does not authorize parking."));
     }
@@ -694,7 +691,11 @@ async function dashboard() {
       paragraph("View ticket details, make a payment, or submit an appeal."),
       buttonLink("Manage Tickets", "/ds3/tickets", true)),
   );
-  content.append(grid);
+  content.append(grid, card(heading("Faculty, staff and visitors"),
+    paragraph("The application above is for student permits. Find other parking options on UNH's official website."),
+    element("div", {class: "actions"},
+      buttonLink("Faculty and staff parking — UNH website", "https://www.unh.edu/transportation/employee-permits"),
+      buttonLink("Visitor parking — UNH website", "https://www.unh.edu/transportation/parking/visitor-metered-parking"))));
   await coverage(true, maps);
 }
 
@@ -959,6 +960,25 @@ function contextHelp(topic, guidance) {
     paragraph(guidance), link("Read the " + topic + " FAQ", "/ds3/help#" + section));
 }
 
+const helpContexts = {
+  home: ["Getting started", "Apply for a student permit, check an application, find covered lots, or manage a ticket using the main navigation."],
+  permits: ["Student permit applications", "Answer the residence and year questions to see eligible permits. Commuter eligibility is optional; other permit types may still match."],
+  "my-parking": ["Application status", "A pending application does not authorize parking. Check its status here, or withdraw an incorrect application before applying again."],
+  lots: ["Finding covered lots", "Choose a permit and select Show Parking Locations. Read its covered-lot list first, then expand the official campus map if needed."],
+  tickets: ["Managing tickets", "Search by ticket number, or add the details from your citation. Select unpaid tickets to review a payment or appeal. Appeals require an explanation."],
+  vehicles: ["Saved vehicles", "Add a vehicle to reuse it in future applications. Edit or remove saved vehicles here; submitted applications retain their original details."],
+};
+const permitStepHelp = {
+  1: ["About you", "Choose your residence and year. Off-campus students should check commuter eligibility only if they meet the listed requirements; leaving it unchecked does not block other eligible permits."],
+  2: ["Choosing a permit", "Select a matching permit and check its price. Options marked lottery require enrollment through UNH's official instructions; selection is not guaranteed."],
+  3: ["Vehicle details", "Choose a compatible saved vehicle or enter the plate and two-letter state code manually. The required vehicle type is shown above the fields."],
+  4: ["Reviewing your application", "Check the permit price, applicant and vehicle details. Use the Edit buttons to correct them, then select Submit application. Wait for approval before parking."],
+  5: ["After submission", "Save your confirmation number and check My Applications for status. A received or pending application is not permission to park."],
+};
+function taskGuidance(page, step) {
+  return (page === "permits" && Object.hasOwn(permitStepHelp, step) && permitStepHelp[step]) || helpContexts[page] || helpContexts.home;
+}
+
 async function help() {
   const { commuter_rule: commuterRule } = await api("/ds3/permit-form-options");
   const faq = (question, answer, destination) => element("details", {}, element("summary", {}, question),
@@ -973,7 +993,14 @@ async function help() {
     faq("How do I find a ticket?", "Enter the ticket number shown on the citation. If you have not added the ticket yet, enter its details first.", link("Find or add a ticket", "/ds3/tickets")),
     faq("How do I review a payment or appeal?", "Select the tickets, verify the total and review the details before recording your action. Open the ticket record to find its confirmation."));
   ticketHelp.id = "tickets";
-  content.append(permitHelp, ticketHelp, card(heading("Contact Parking Services"),
+  const context = query.get("context");
+  if (Object.hasOwn(helpContexts, context)) {
+    const [title, text] = taskGuidance(context, query.get("step"));
+    content.append(card(heading("Help with: " + title), paragraph(text)));
+    if (context === "tickets") ticketHelp.querySelector("details").open = true;
+    else if (context === "permits") permitHelp.querySelector("details").open = true;
+  }
+  content.append(...(context === "tickets" ? [ticketHelp, permitHelp] : [permitHelp, ticketHelp]), card(heading("Contact Parking Services"),
     paragraph("Send a written question using the official UNH contact form. Include your email address for a reply. For ticket appeals, use the Tickets page."),
     buttonLink("Open UNH written support form", "https://www.unh.edu/transportation/about/contact-us", true)));
   if (location.hash === "#permits" || location.hash === "#tickets") document.getElementById(location.hash.slice(1)).scrollIntoView();
@@ -1062,64 +1089,38 @@ start().catch(error => {
 
 
 const helpDialog = document.querySelector("#parking-help-dialog");
-const footerHelpButton = document.querySelector(
-  '.portal-footer a[href="/ds3/help"]'
-);
+const helpLauncher = document.querySelector(".help-launcher");
 
-if (footerHelpButton && helpDialog) {
-  footerHelpButton.textContent = "Need parking help?";
-
-  const title = document.createElement("h2");
-  title.id = "parking-help-title";
-  title.textContent = "Parking Help";
-
-  const helpPage = document.createElement("iframe");
+if (helpLauncher && helpDialog) {
+  const title = element("h2", {id: "parking-help-title"}, "Parking Help");
+  const closeButton = action("Close help", () => helpDialog.close());
+  const helpPage = element("iframe", {title: "Parking help for your current task", class: "help-frame"});
   helpPage.addEventListener("load", () => {
     const helpDocument = helpPage.contentDocument;
-  
     if (!helpDocument) return;
-  
     const navigation = helpDocument.createElement("base");
     navigation.target = "_top";
-    helpDocument.head.appendChild(navigation);
     const popupStyles = helpDocument.createElement("style");
     popupStyles.textContent = `
-      .masthead,
-      .nav-bar,
-      .portal-footer,
-      .skip {
-        display: none;
-      }
-  
-      main.wrap {
-        width: 100%;
-        max-width: none;
-        margin: 0;
-        padding: 1rem;
-        box-sizing: border-box;
-      }
+      .masthead, .nav-bar, .portal-footer, .skip, .help-launcher, main > h1 { display: none; }
+      body { padding-bottom: 0; }
+      main.wrap { width: 100%; max-width: none; margin: 0; padding: .5rem; box-sizing: border-box; }
     `;
-  
-    helpDocument.head.appendChild(popupStyles);
-    helpDocument.querySelectorAll("a[href]").forEach(anchor => anchor.target = "_top");
-    helpDocument.addEventListener("keydown", event => { if (event.key === "Escape") helpDialog.close(); });
+    helpDocument.head.append(navigation, popupStyles);
+    helpDocument.addEventListener("keydown", event => {
+      if (event.key === "Escape") { event.preventDefault(); helpDialog.close(); }
+    });
   });
-  helpPage.src = "/ds3/help";
-  helpPage.title = "Parking frequently asked questions";
-  helpPage.style.width = "100%";
-  helpPage.style.height = "60vh";
-  helpPage.style.border = "0";
-
-  const closeButton = document.createElement("button");
-  closeButton.type = "button";
-  closeButton.textContent = "Close";
-  closeButton.addEventListener("click", () => helpDialog.close());
-
-  helpDialog.replaceChildren(title, helpPage, closeButton);
-  helpDialog.addEventListener("close", () => footerHelpButton.focus());
-
-  footerHelpButton.addEventListener("click", event => {
+  helpDialog.replaceChildren(element("div", {class: "help-dialog-header"}, title, closeButton), helpPage,
+    link("Open all parking help on a full page", "/ds3/help"));
+  helpDialog.addEventListener("close", () => helpLauncher.focus());
+  helpLauncher.addEventListener("click", event => {
     event.preventDefault();
+    const page = document.body.dataset.page;
+    const step = content.querySelector(".progress [aria-current=step] span")?.textContent ||
+      content.querySelector("h2")?.textContent.match(/^Step (\d)/)?.[1] || "";
+    const parameters = new URLSearchParams({context: page, step});
+    helpPage.src = "/ds3/help?" + parameters;
     helpDialog.showModal();
     closeButton.focus();
   });

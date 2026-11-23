@@ -142,3 +142,15 @@ nav a { font-size: .94rem; }
 .campus-map summary { color: var(--navy); }
 .lottery-notice { margin-block: 1rem; padding: 1rem; border-left: 4px solid #0075be; background: #edf3fa; }
 .lottery-notice h3 { margin-top: 0; }
+
+/* Keep help reachable without obscuring the last page controls. */
+body { padding-bottom: 5.5rem; }
+.help-launcher { position: fixed; bottom: 1rem; right: 1rem; z-index: 5; box-shadow: 0 3px 12px #041e4233; }
+.help-dialog-header { position: sticky; top: -1.5rem; display: flex; justify-content: space-between; align-items: center; gap: 1rem; padding-block: .75rem; background: white; }
+.help-dialog-header h2 { margin: 0; }
+.help-frame { display: block; width: 100%; height: 55vh; border: 0; }
+.parking-warning { border: 2px solid #946200; border-left-width: 6px; background: #fff2cc; color: #422b00; }
+.parking-warning h3 { color: #422b00; font-size: 1.15rem; }
+.parking-warning strong { font-size: 1.1rem; }
+.permit-price { font-size: 1.2rem; font-weight: 750; color: var(--navy); }
+@media print { .help-launcher { display: none; } body { padding-bottom: 0; } }

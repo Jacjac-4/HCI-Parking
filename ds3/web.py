@@ -53,6 +53,5 @@ def page(page: str = ""):
     return (directory / "page.html").read_text(encoding="utf-8").format(
         title=title, browser_title="Home" if not page else title, navigation="".join(nav), page=page or "home",
         brand='<a href="/ds3/">UNH Parking</a>' if page else '<strong class="brand-title">UNH Parking</strong>',
-        footer_help='' if page == "help" else '<a class="button-link primary" href="/ds3/help">Parking Help</a>',
         intro='<p class="page-intro">Apply for parking permits, track application status, find parking locations, and manage tickets.</p>' if not page else "",
     )
